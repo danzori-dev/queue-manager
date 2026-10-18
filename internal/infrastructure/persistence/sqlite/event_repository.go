@@ -83,6 +83,61 @@ func (r *EventRepository) Get(ctx context.Context, eventID int64) (domain.Event,
 	return event, nil
 }
 
+func (r *EventRepository) ListRecent(ctx context.Context, limit int) ([]domain.Event, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const query = `
+		SELECT id, chat_id, thread_id, message_id, title, status, created_at, closed_at
+		FROM events
+		ORDER BY id DESC
+		LIMIT ?
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query recent events: %w", err)
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var events []domain.Event
+
+	for rows.Next() {
+		var (
+			event     domain.Event
+			messageID sql.NullInt64
+			status    string
+			createdAt int64
+			closedAt  sql.NullInt64
+		)
+
+		err := rows.Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status, &createdAt, &closedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan event: %w", err)
+		}
+
+		event.MessageID = int(messageID.Int64)
+		event.Status = domain.Status(status)
+		event.CreatedAt = time.Unix(createdAt, 0)
+
+		if closedAt.Valid {
+			t := time.Unix(closedAt.Int64, 0)
+			event.ClosedAt = &t
+		}
+
+		events = append(events, event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent events: %w", err)
+	}
+
+	return events, nil
+}
+
 func (r *EventRepository) ListOpenIDs(ctx context.Context) ([]int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
@@ -133,6 +188,24 @@ func (r *EventRepository) SetMessageID(ctx context.Context, eventID int64, messa
 
 	if _, err := r.db.ExecContext(ctx, query, messageID, eventID); err != nil {
 		return fmt.Errorf("update event message id: %w", err)
+	}
+
+	return nil
+}
+
+func (r *EventRepository) SetStatus(ctx context.Context, eventID int64, status domain.Status) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const query = `
+		UPDATE events
+		SET status = ?,
+		    closed_at = CASE WHEN ? = 'closed' THEN unixepoch() END
+		WHERE id = ?
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, string(status), string(status), eventID); err != nil {
+		return fmt.Errorf("update event status: %w", err)
 	}
 
 	return nil
