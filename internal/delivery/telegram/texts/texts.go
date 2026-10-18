@@ -5,6 +5,8 @@ import (
 	"html"
 	"strings"
 
+	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
+	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
@@ -16,7 +18,8 @@ const (
 		"<code>/help</code> - показать эту справку"
 	HelpAdmin = "<b>Администратор:</b>\n\n" +
 		"<code>/settopic</code> - назначить топик, в котором будут публиковаться очереди (написать в самом топике)\n" +
-		"<code>/new &lt;название&gt;</code> - создать очередь"
+		"<code>/new &lt;название&gt;</code> - создать очередь\n" +
+		"<code>/events</code> - управление очередями"
 	HelpOwner = "<b>Владелец:</b>\n\n" +
 		"<code>/addadmin &lt;user_id&gt;</code> - назначить администратора\n" +
 		"<code>/rmadmin &lt;user_id&gt;</code> - удалить администратора\n" +
@@ -41,6 +44,8 @@ const (
 	AdminNotFound      = "Такого администратора нет в списке."
 	AdminsEmpty        = "Список администраторов пуст."
 
+	StudentsListEmpty = "Список студентов пуст.\n\n" + ImportStudentUsage
+
 	EventTitleTooLong = "Название слишком длинное: максимум 100 символов."
 	EventCreated      = "Очередь создана и опубликована."
 	QueueTopicSet     = "Готово: очереди будут публиковаться в этом топике."
@@ -52,7 +57,25 @@ const (
 	QueueClosed   = "Запись в эту очередь закрыта."
 	QueueNotFound = "Очередь не найдена."
 
-	StudentsListEmpty = "Список студентов пуст.\n\n" + ImportStudentUsage
+	EventsTitle  = "<b>Очереди:</b>\nВыберите очередь, чтобы управлять ею."
+	EventsEmpty  = "Очередей нет."
+	EventDeleted = "Очередь удалена."
+	EventGone    = "Эта очередь уже удалена."
+
+	ButtonClose         = "Закрыть запись"
+	ButtonOpen          = "Открыть запись"
+	ButtonRefresh       = "Обновить"
+	ButtonDelete        = "Удалить очередь"
+	ButtonConfirmDelete = "Да, удалить"
+	ButtonCancel        = "Отмена"
+	ButtonBack          = "<- К списку"
+
+	EventClosedAnswer  = "Запись закрыта."
+	EventOpenedAnswer  = "Запись открыта."
+	EventDeletedAnswer = "Очередь удалена."
+
+	ParticipantRemoved  = "Студент убран из очереди."
+	ParticipantNotFound = "Этого студента уже нет в очереди."
 )
 
 func Help(sections ...string) string {
@@ -129,4 +152,41 @@ func JoinedQueue(position int) string {
 
 func AlreadyInQueue(position int) string {
 	return fmt.Sprintf("Ты уже в очереди: %d-й", position)
+}
+
+func EventMenu(view appqueue.View) string {
+	var b strings.Builder
+
+	b.WriteString("<b>" + html.EscapeString(view.Event.Title) + "</b>\n")
+
+	if view.Event.Status == domain.StatusClosed {
+		b.WriteString("Статус: 🔒 запись закрыта\n")
+	} else {
+		b.WriteString("Статус: запись открыта\n")
+	}
+
+	if len(view.Lines) == 0 {
+		b.WriteString("\nВ очереди никого нет.")
+
+		return b.String()
+	}
+
+	for _, line := range view.Lines {
+		fmt.Fprintf(&b, "\n%d. %s", line.Position, html.EscapeString(line.Name))
+
+		if line.UserName != "" {
+			fmt.Fprintf(&b, " (@%s)", line.UserName)
+		}
+	}
+
+	b.WriteString("\n\nНажмите на студента, чтобы убрать его из очереди.")
+
+	return b.String()
+}
+
+func DeleteConfirm(title string) string {
+	return fmt.Sprintf(
+		"Удалить очередь <b>%s</b>?\n\nСообщение очереди в группе и список участников будут удалены.",
+		html.EscapeString(title),
+	)
 }

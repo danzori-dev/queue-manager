@@ -2,11 +2,14 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/mymmrac/telego"
+	ta "github.com/mymmrac/telego/telegoapi"
 	tu "github.com/mymmrac/telego/telegoutil"
 
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/middleware"
@@ -44,6 +47,10 @@ func New(d Deps) *Handler {
 }
 
 func (h *Handler) sendHTML(ctx context.Context, msg telego.Message, text string) error {
+	return h.sendMenu(ctx, msg, text, nil)
+}
+
+func (h *Handler) sendMenu(ctx context.Context, msg telego.Message, text string, kb *telego.InlineKeyboardMarkup) error {
 	reqCtx, cancel := context.WithTimeout(ctx, h.apiTimeout)
 	defer cancel()
 
@@ -51,12 +58,40 @@ func (h *Handler) sendHTML(ctx context.Context, msg telego.Message, text string)
 		WithParseMode(telego.ModeHTML).
 		WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true})
 
+	if kb != nil {
+		params = params.WithReplyMarkup(kb)
+	}
+
 	if msg.MessageThreadID != 0 {
 		params = params.WithMessageThreadID(msg.MessageThreadID)
 	}
 
 	if _, err := h.bot.SendMessage(reqCtx, params); err != nil {
 		return fmt.Errorf("send message: %w", err)
+	}
+
+	return nil
+}
+
+func (h *Handler) editMenu(ctx context.Context, query telego.CallbackQuery, text string, kb *telego.InlineKeyboardMarkup) error {
+	reqCtx, cancel := context.WithTimeout(ctx, h.apiTimeout)
+	defer cancel()
+
+	params := tu.EditMessageText(tu.ID(query.Message.GetChat().ID), query.Message.GetMessageID(), text).
+		WithParseMode(telego.ModeHTML).
+		WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true})
+
+	if kb != nil {
+		params = params.WithReplyMarkup(kb)
+	}
+
+	if _, err := h.bot.EditMessageText(reqCtx, params); err != nil {
+		apiErr, ok := errors.AsType[*ta.Error](err)
+		if ok && strings.Contains(apiErr.Description, "message is not modified") {
+			return nil
+		}
+
+		return fmt.Errorf("edit menu: %w", err)
 	}
 
 	return nil

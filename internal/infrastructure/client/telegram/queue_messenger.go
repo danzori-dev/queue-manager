@@ -84,10 +84,69 @@ func (m *QueueMessenger) Edit(ctx context.Context, view appqueue.View) (time.Dur
 	return 0, nil
 }
 
+func (m *QueueMessenger) Delete(ctx context.Context, event domain.Event) {
+	if event.MessageID == 0 {
+		return
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
+	defer cancel()
+
+	err := m.bot.DeleteMessage(
+		reqCtx, &telego.DeleteMessageParams{
+			ChatID:    tu.ID(event.ChatID),
+			MessageID: event.MessageID,
+		},
+	)
+	if err != nil {
+		m.log.WarnContext(
+			ctx, "delete queue message",
+			slog.Int64("event_id", event.ID),
+			slog.Any("err", err),
+		)
+	}
+}
+
+func (m *QueueMessenger) AnnounceRemoval(ctx context.Context, removal appqueue.Removal) {
+	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
+	defer cancel()
+
+	event := removal.Event
+
+	params := tu.Message(tu.ID(event.ChatID), renderRemoval(removal)).
+		WithParseMode(telego.ModeHTML)
+
+	if event.ThreadID != 0 {
+		params = params.WithMessageThreadID(event.ThreadID)
+	}
+
+	if event.MessageID != 0 {
+		params = params.WithReplyParameters(
+			&telego.ReplyParameters{
+				MessageID:                event.MessageID,
+				AllowSendingWithoutReply: true,
+			},
+		)
+	}
+
+	if _, err := m.bot.SendMessage(reqCtx, params); err != nil {
+		m.log.WarnContext(
+			ctx, "announce participant removal",
+			slog.Int64("event_id", event.ID),
+			slog.Int64("target_user_id", removal.UserID),
+			slog.Any("err", err),
+		)
+	}
+}
+
 func renderQueue(view appqueue.View) string {
 	var b strings.Builder
 
 	b.WriteString("<b>" + html.EscapeString(view.Event.Title) + "</b>\n")
+
+	if view.Event.Status == domain.StatusClosed {
+		b.WriteString("🔒 Запись закрыта.\n")
+	}
 
 	if len(view.Lines) == 0 {
 		b.WriteString("\nВ очереди никого нет.")
@@ -98,8 +157,8 @@ func renderQueue(view appqueue.View) string {
 	for _, line := range view.Lines {
 		fmt.Fprintf(&b, "\n%d. %s", line.Position, html.EscapeString(line.Name))
 
-		if line.Username != "" {
-			fmt.Fprintf(&b, " (@%s)", line.Username)
+		if line.UserName != "" {
+			fmt.Fprintf(&b, " (@%s)", line.UserName)
 		}
 	}
 
@@ -108,7 +167,24 @@ func renderQueue(view appqueue.View) string {
 	return b.String()
 }
 
+func renderRemoval(r appqueue.Removal) string {
+	actor := "Администратор"
+
+	if r.ActorName != "" {
+		actor += " " + html.EscapeString(r.ActorName)
+	}
+
+	return fmt.Sprintf(
+		`%s убрал <a href="tg://user?id=%d">%s</a> из очереди «%s».`,
+		actor, r.UserID, html.EscapeString(r.UserName), html.EscapeString(r.Event.Title),
+	)
+}
+
 func queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
+	if view.Event.Status == domain.StatusClosed {
+		return &telego.InlineKeyboardMarkup{InlineKeyboard: [][]telego.InlineKeyboardButton{}}
+	}
+
 	join := domain.Action{
 		Kind:    domain.ActionJoin,
 		EventID: view.Event.ID,

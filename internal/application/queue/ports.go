@@ -10,8 +10,10 @@ import (
 type EventRepository interface {
 	Create(ctx context.Context, event domain.Event) (int64, error)
 	Get(ctx context.Context, eventID int64) (domain.Event, error)
+	ListRecent(ctx context.Context, limit int) ([]domain.Event, error)
 	ListOpenIDs(ctx context.Context) ([]int64, error)
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
+	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	Delete(ctx context.Context, eventID int64) error
 }
 
@@ -34,6 +36,8 @@ type StudentDirectory interface {
 type Messenger interface {
 	Publish(ctx context.Context, view View) (int, error)
 	Edit(ctx context.Context, view View) (time.Duration, error)
+	Delete(ctx context.Context, event domain.Event)
+	AnnounceRemoval(ctx context.Context, removal Removal)
 }
 
 type RenderScheduler interface {
@@ -47,6 +51,14 @@ type View struct {
 
 type Line struct {
 	Position int
+	UserID   int64
 	Name     string
-	Username string
+	UserName string
+}
+
+type Removal struct {
+	Event     domain.Event
+	ActorName string
+	UserID    int64
+	UserName  string
 }

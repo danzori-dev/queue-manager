@@ -13,6 +13,8 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/application/logctx"
 )
 
+const slowUpdate = time.Second
+
 func Logging(log *slog.Logger) th.Handler {
 	return func(ctx *th.Context, update telego.Update) error {
 		start := time.Now()
@@ -20,22 +22,28 @@ func Logging(log *slog.Logger) th.Handler {
 		ctx = ctx.WithContext(stdCtx)
 
 		err := ctx.Next(update)
-		durationMs := time.Since(start).Milliseconds()
+		duration := time.Since(start)
 
-		if err != nil {
+		switch {
+		case err != nil:
 			log.ErrorContext(
-				ctx.Context(), "update handling failed",
-				slog.Int64("duration_ms", durationMs),
+				ctx, "update handling failed",
+				slog.Int64("duration_ms", duration.Milliseconds()),
 				slog.Any("err", err),
 			)
 
-			return nil
-		}
+		case duration > slowUpdate:
+			log.WarnContext(
+				ctx, "update handled slowly",
+				slog.Int64("duration_ms", duration.Milliseconds()),
+			)
 
-		log.InfoContext(
-			ctx.Context(), "update handled",
-			slog.Int64("duration_ms", durationMs),
-		)
+		default:
+			log.DebugContext(
+				ctx, "update handled",
+				slog.Int64("duration_ms", duration.Milliseconds()),
+			)
+		}
 
 		return nil
 	}
