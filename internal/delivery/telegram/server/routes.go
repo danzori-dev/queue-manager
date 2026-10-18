@@ -35,9 +35,13 @@ func RegisterRoutes(p RouteParams) Register {
 
 		bh.HandleCallbackQuery(
 			p.Handler.HandleQueueCallback, th.AnyCallbackQueryWithMessage(),
-			th.Or(
-				th.CallbackDataPrefix(string(domain.ActionJoin)+":"),
-				th.CallbackDataPrefix(string(domain.ActionLeave)+":"),
+			actions(domain.ActionJoin, domain.ActionLeave),
+		)
+		bh.HandleCallbackQuery(
+			p.Handler.HandleMenuCallback, th.AnyCallbackQueryWithMessage(),
+			actions(
+				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
+				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick,
 			),
 		)
 
@@ -49,6 +53,7 @@ func RegisterRoutes(p RouteParams) Register {
 
 		private.HandleMessage(p.Handler.HandleStart, th.CommandEqual("start"))
 		private.HandleMessage(p.Handler.HandleNew, th.CommandEqual("new"))
+		private.HandleMessage(p.Handler.HandleEvents, th.CommandEqual("events"))
 
 		private.HandleMessage(p.Handler.HandleAddAdmin, th.CommandEqual("addadmin"))
 		private.HandleMessage(p.Handler.HandleRmAdmin, th.CommandEqual("rmadmin"))
@@ -66,4 +71,14 @@ func privateChat(_ context.Context, update telego.Update) bool {
 
 func groupChat(_ context.Context, update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypeSupergroup
+}
+
+func actions(kinds ...domain.ActionKind) th.Predicate {
+	predicates := make([]th.Predicate, 0, len(kinds))
+
+	for _, k := range kinds {
+		predicates = append(predicates, th.CallbackDataPrefix(string(k)+":"))
+	}
+
+	return th.Or(predicates...)
 }

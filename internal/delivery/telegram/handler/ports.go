@@ -26,4 +26,11 @@ type QueueService interface {
 	CreateEvent(ctx context.Context, title string) (domain.Event, error)
 	Join(ctx context.Context, eventID, userID int64, username string) (appqueue.JoinResult, error)
 	Leave(ctx context.Context, eventID, userID int64) (bool, error)
+
+	Events(ctx context.Context) ([]domain.Event, error)
+	EventView(ctx context.Context, eventID int64) (appqueue.View, error)
+	CloseEvent(ctx context.Context, eventID int64) error
+	OpenEvent(ctx context.Context, eventID int64) error
+	RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
+	DeleteEvent(ctx context.Context, eventID int64) error
 }
