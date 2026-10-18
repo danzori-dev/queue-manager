@@ -36,6 +36,8 @@ type StudentDirectory interface {
 type Messenger interface {
 	Publish(ctx context.Context, view View) (int, error)
 	Edit(ctx context.Context, view View) (time.Duration, error)
+	Delete(ctx context.Context, event domain.Event)
+	AnnounceRemoval(ctx context.Context, removal Removal)
 }
 
 type RenderScheduler interface {
@@ -49,6 +51,14 @@ type View struct {
 
 type Line struct {
 	Position int
+	UserID   int64
 	Name     string
-	Username string
+	UserName string
+}
+
+type Removal struct {
+	Event     domain.Event
+	ActorName string
+	UserID    int64
+	UserName  string
 }

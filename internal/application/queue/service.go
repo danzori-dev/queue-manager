@@ -9,6 +9,8 @@ import (
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
+const recentEventsLimit = 20
+
 type Deps struct {
 	Events    EventRepository
 	Entries   EntryRepository
@@ -151,9 +153,95 @@ func (s *Service) Leave(ctx context.Context, eventID, userID int64) (bool, error
 	return removed, nil
 }
 
-func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration, error) {
+func (s *Service) OpenEventIDs(ctx context.Context) ([]int64, error) {
+	ids, err := s.events.ListOpenIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list open events: %w", err)
+	}
+
+	return ids, nil
+}
+
+func (s *Service) Events(ctx context.Context) ([]domain.Event, error) {
+	events, err := s.events.ListRecent(ctx, recentEventsLimit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent events: %w", err)
+	}
+
+	return events, nil
+}
+
+func (s *Service) EventView(ctx context.Context, eventID int64) (View, error) {
 	event, err := s.events.Get(ctx, eventID)
 	if err != nil {
+		return View{}, err
+	}
+
+	return s.view(ctx, event)
+}
+
+func (s *Service) CloseEvent(ctx context.Context, eventID int64) error {
+	return s.setStatus(ctx, eventID, domain.StatusClosed)
+}
+
+func (s *Service) OpenEvent(ctx context.Context, eventID int64) error {
+	return s.setStatus(ctx, eventID, domain.StatusOpen)
+}
+
+func (s *Service) RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error) {
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return false, err
+	}
+
+	removed, err := s.entries.Remove(ctx, eventID, userID)
+	if err != nil {
+		return false, fmt.Errorf("remove entry: %w", err)
+	}
+
+	if !removed {
+		return false, nil
+	}
+
+	s.scheduler.Schedule(eventID)
+
+	actorName, _ := s.students.Name(actorID)
+
+	s.messages.AnnounceRemoval(
+		ctx, Removal{
+			Event:     event,
+			ActorName: actorName,
+			UserID:    userID,
+			UserName:  s.studentName(userID),
+		},
+	)
+
+	return true, nil
+}
+
+func (s *Service) DeleteEvent(ctx context.Context, eventID int64) error {
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.events.Delete(ctx, eventID); err != nil {
+		return fmt.Errorf("delete event: %w", err)
+	}
+
+	s.messages.Delete(ctx, event)
+
+	return nil
+}
+
+func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration, error) {
+	event, err := s.events.Get(ctx, eventID)
+
+	switch {
+	case errors.Is(err, domain.ErrEventNotFound):
+		return 0, nil
+
+	case err != nil:
 		return 0, fmt.Errorf("get event: %w", err)
 	}
 
@@ -174,15 +262,6 @@ func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration
 	return retryAfter, nil
 }
 
-func (s *Service) OpenEventIDs(ctx context.Context) ([]int64, error) {
-	ids, err := s.events.ListOpenIDs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list open events: %w", err)
-	}
-
-	return ids, nil
-}
-
 func (s *Service) view(ctx context.Context, event domain.Event) (View, error) {
 	entries, err := s.entries.List(ctx, event.ID)
 	if err != nil {
@@ -192,16 +271,12 @@ func (s *Service) view(ctx context.Context, event domain.Event) (View, error) {
 	lines := make([]Line, 0, len(entries))
 
 	for i, e := range entries {
-		name, ok := s.students.Name(e.UserID)
-		if !ok {
-			name = fmt.Sprintf("id%d", e.UserID)
-		}
-
 		lines = append(
 			lines, Line{
 				Position: i + 1,
-				Name:     name,
-				Username: e.Username,
+				UserID:   e.UserID,
+				Name:     s.studentName(e.UserID),
+				UserName: e.Username,
 			},
 		)
 	}
@@ -210,4 +285,31 @@ func (s *Service) view(ctx context.Context, event domain.Event) (View, error) {
 		Event: event,
 		Lines: lines,
 	}, nil
+}
+
+func (s *Service) setStatus(ctx context.Context, eventID int64, status domain.Status) error {
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	if event.Status == status {
+		return nil
+	}
+
+	if err := s.events.SetStatus(ctx, eventID, status); err != nil {
+		return fmt.Errorf("set event status: %w", err)
+	}
+
+	s.scheduler.Schedule(eventID)
+
+	return nil
+}
+
+func (s *Service) studentName(userID int64) string {
+	if name, ok := s.students.Name(userID); ok {
+		return name
+	}
+
+	return fmt.Sprintf("id%d", userID)
 }
