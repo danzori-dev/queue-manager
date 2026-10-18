@@ -175,7 +175,7 @@ func renderRemoval(r appqueue.Removal) string {
 	}
 
 	return fmt.Sprintf(
-		`%s убрал <a href="tg://user?id=%d">%s</a> из очереди "%s"".`,
+		`%s убрал <a href="tg://user?id=%d">%s</a> из очереди «%s».`,
 		actor, r.UserID, html.EscapeString(r.UserName), html.EscapeString(r.Event.Title),
 	)
 }
