@@ -1,0 +1,29 @@
+telegram:
+    token: "${TELEGRAM_BOT_TOKEN}"
+    owner_id: "${TELEGRAM_BOT_OWNER_ID}"
+    api_timeout: "${TELEGRAM_API_TIMEOUT:-10s}"
+    retry:
+        max_attempts: "${TELEGRAM_RETRY_MAX_ATTEMPTS:-3}"
+        exponent_base: "${TELEGRAM_RETRY_EXPONENT_BASE:-2.0}"
+        start_delay: "${TELEGRAM_RETRY_START_DELAY:-500ms}"
+        max_delay: "${TELEGRAM_RETRY_MAX_DELAY:-8s}"
+    poll:
+        timeout: "${TELEGRAM_POLL_TIMEOUT:-30s}"
+        retry_timeout: "${TELEGRAM_POLL_RETRY_TIMEOUT:-5s}"
+        stop_timeout: "${TELEGRAM_POLL_STOP_TIMEOUT:-10s}"
+        reconnect_delay: "${TELEGRAM_POLL_RECONNECT_DELAY:-10s}"
+
+sqlite:
+    dsn: "${SQLITE_DSN}"
+    auth_token: "${SQLITE_AUTH_TOKEN}"
+    query_timeout: "${SQLITE_QUERY_TIMEOUT:-5s}"
+
+render:
+    debounce: "${RENDER_DEBOUNCE:-1s}"
+    min_interval: "${RENDER_MIN_INTERVAL:-3s}"
+    retry_delay: "${RENDER_RETRY_DELAY:-5s}"
+    max_attempts: "${RENDER_MAX_ATTEMPTS:-5}"
+
+log:
+    level: "${LOG_LEVEL:-info}"
+    format: "${LOG_FORMAT:-json}"

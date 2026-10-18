@@ -1,0 +1,9 @@
+.env
+
+.git
+.github/
+.idea/
+.DS_Store
+
+students.json
+docs/

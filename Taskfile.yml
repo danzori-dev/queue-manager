@@ -1,0 +1,54 @@
+version: "3"
+
+dotenv:
+    - .env
+
+vars:
+    MIGRATIONS_DIR: migrations
+
+tasks:
+    lint:
+        desc: Run golangci-lint
+        cmds:
+            - golangci-lint run
+
+    lint:fix:
+        desc: Run golangci-lint with autofix
+        cmds:
+            - golangci-lint run --fix
+
+    fmt:
+        desc: Apply formatters
+        cmds:
+            - golangci-lint fmt
+
+    fix:
+        desc: Rewrite code that uses outdated Go APIs
+        cmds:
+            - go fix ./...
+
+    migrate:create:
+        desc: "Create a migration: task migrate:create -- init"
+        cmds:
+            - mkdir -p {{.MIGRATIONS_DIR}}
+            - goose -dir {{.MIGRATIONS_DIR}} create {{.CLI_ARGS}} sql
+
+    migrate:status:
+        desc: Show migration status
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} turso "$SQLITE_DSN?authToken=$SQLITE_AUTH_TOKEN" status
+
+    migrate:up:
+        desc: Apply migrations
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} turso "$SQLITE_DSN?authToken=$SQLITE_AUTH_TOKEN" up
+
+    migrate:down:
+        desc: Roll back last migration
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} turso "$SQLITE_DSN?authToken=$SQLITE_AUTH_TOKEN" down
+
+    migrate:reset:
+        desc: Roll back all migrations
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} turso "$SQLITE_DSN?authToken=$SQLITE_AUTH_TOKEN" reset
