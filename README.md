@@ -6,8 +6,8 @@ Telegram bot for managing queues in a university study group.
 
 [![CI](https://github.com/danzori-dev/queue-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/danzori-dev/queue-manager/actions/workflows/ci.yml)
 [![Go version](https://img.shields.io/github/go-mod/go-version/danzori-dev/queue-manager)](go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/danzori-dev/queue-manager)](https://goreportcard.com/report/github.com/danzori-dev/queue-manager)
 [![Release](https://img.shields.io/github/v/release/danzori-dev/queue-manager)](https://github.com/danzori-dev/queue-manager/releases)
+[![License](https://img.shields.io/github/license/danzori-dev/queue-manager)](LICENSE)
 
 </div>
 
