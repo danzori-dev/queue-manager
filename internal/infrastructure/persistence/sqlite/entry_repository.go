@@ -27,8 +27,10 @@ func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, userna
 	defer cancel()
 
 	const query = `
-		INSERT INTO queue_entries (event_id, user_id, username)
-		VALUES (?, ?, ?)
+		INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+		SELECT ?, ?, ?, coalesce(max(sort_key), 0) + 1
+		FROM queue_entries
+		WHERE event_id = ?
 		ON CONFLICT (event_id, user_id) DO NOTHING
 		RETURNING id
 	`
@@ -36,7 +38,7 @@ func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, userna
 	var id int64
 
 	err := r.db.
-		QueryRowContext(ctx, query, eventID, userID, username).
+		QueryRowContext(ctx, query, eventID, userID, username, eventID).
 		Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
@@ -83,7 +85,7 @@ func (r *EntryRepository) Position(ctx context.Context, eventID, userID int64) (
 		SELECT count(*)
 		FROM queue_entries
 		WHERE event_id = ?
-			AND id <= (SELECT id FROM queue_entries WHERE event_id = ? AND user_id = ?)
+			AND sort_key <= (SELECT sort_key FROM queue_entries WHERE event_id = ? AND user_id = ?)
 	`
 
 	var position int
@@ -106,7 +108,7 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 		SELECT id, user_id, username
 		FROM queue_entries
 		WHERE event_id = ?
-		ORDER BY id
+		ORDER BY sort_key
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, eventID)
