@@ -36,4 +36,7 @@ type QueueService interface {
 	OpenEvent(ctx context.Context, eventID int64) error
 	RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
 	DeleteEvent(ctx context.Context, eventID int64) error
+
+	PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (appqueue.CarryPlan, error)
+	Carry(ctx context.Context, fromID int64, fromPos int, toID int64) (int, error)
 }

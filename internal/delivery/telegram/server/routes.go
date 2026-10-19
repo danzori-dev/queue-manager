@@ -44,6 +44,7 @@ func RegisterRoutes(p RouteParams) Register {
 			actions(
 				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
 				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick,
+				domain.ActionCarry, domain.ActionCarryCancel,
 			),
 		)
 
@@ -56,6 +57,7 @@ func RegisterRoutes(p RouteParams) Register {
 		private.HandleMessage(p.Handler.HandleStart, th.CommandEqual("start"))
 		private.HandleMessage(p.Handler.HandleNew, th.CommandEqual("new"))
 		private.HandleMessage(p.Handler.HandleEvents, th.CommandEqual("events"))
+		private.HandleMessage(p.Handler.HandleCarry, th.CommandEqual("carry"))
 
 		private.HandleMessage(p.Handler.HandleAddAdmin, th.CommandEqual("addadmin"))
 		private.HandleMessage(p.Handler.HandleRmAdmin, th.CommandEqual("rmadmin"))

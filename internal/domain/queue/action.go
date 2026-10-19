@@ -19,6 +19,8 @@ const (
 	ActionDeleteConfirm ActionKind = "delconfirm"
 	ActionKick          ActionKind = "kick"
 	ActionSkip          ActionKind = "skip"
+	ActionCarry         ActionKind = "carry"
+	ActionCarryCancel   ActionKind = "carrycancel"
 )
 
 type Action struct {

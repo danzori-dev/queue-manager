@@ -20,7 +20,8 @@ const (
 	HelpAdmin = "<b>Администратор:</b>\n\n" +
 		"<code>/settopic</code> - назначить топик, в котором будут публиковаться очереди (написать в самом топике)\n" +
 		"<code>/new &lt;название&gt;</code> - создать очередь\n" +
-		"<code>/events</code> - управление очередями"
+		"<code>/events</code> - управление очередями\n" +
+		"<code>/carry &lt;откуда&gt; &lt;с_места&gt; &lt;куда&gt;</code> - перенести людей из одной очереди в начало другой"
 	HelpOwner = "<b>Владелец:</b>\n\n" +
 		"<code>/status</code> - состояние бота\n" +
 		"<code>/addadmin &lt;user_id&gt;</code> - назначить администратора\n" +
@@ -38,6 +39,8 @@ const (
 	RmAdminUsage       = "Использование: <code>/rmadmin &lt;user_id&gt;</code>"
 	ImportStudentUsage = `Пришлите JSON-файл документом с подписью <code>/import_students</code>.`
 	NewEventUsage      = "Использование: <code>/new &lt;title&gt;</code>"
+	CarryUsage         = "Использование: <code>/carry &lt;откуда&gt; &lt;с_места&gt; &lt;куда&gt;</code>\n\n" +
+		"Например: <code>/carry 1 7 2</code>.\nЭто значит: Перенести студентов с 7 места (включительно) очереди #1 в начало очереди #2."
 
 	NotAStudent        = "Такого пользователя нет в списке студентов."
 	CannotAddSelf      = "Нельзя назначить администратором самого себя."
@@ -71,6 +74,7 @@ const (
 	ButtonConfirmDelete = "Да, удалить"
 	ButtonCancel        = "Отмена"
 	ButtonBack          = "<- К списку"
+	ButtonCarry         = "Перенести"
 
 	EventClosedAnswer  = "Запись закрыта."
 	EventOpenedAnswer  = "Запись открыта."
@@ -81,6 +85,14 @@ const (
 
 	SkipPressAgain = "Нажми еще раз в течение 5 секунд, чтобы пропустить одно место."
 	AlreadyLast    = "Ты и так последний."
+
+	CarrySameEvent    = "Нельзя перенести людей в ту же очередь."
+	CarrySourceOpen   = "Исходная очередь еще открыта. Сначала закройте запись."
+	CarryTargetClosed = "Очередь, в которую переносим, закрыта."
+	CarryPosition     = "В исходной очереди нет такого места."
+	CarryExpired      = "Перенос устарел, отправьте /carry еще раз."
+	CarryCanceled     = "Перенос отменен."
+	CarryDoneAnswer   = "Готово. Перенос выполнен."
 
 	BotStopped = "🟡 Бот остановлен."
 )
@@ -164,7 +176,7 @@ func AlreadyInQueue(position int) string {
 func EventMenu(view appqueue.View) string {
 	var b strings.Builder
 
-	b.WriteString("<b>" + html.EscapeString(view.Event.Title) + "</b>\n")
+	fmt.Fprintf(&b, "<b>#%d %s</b>\n", view.Event.ID, html.EscapeString(view.Event.Title))
 
 	if view.Event.Status == domain.StatusClosed {
 		b.WriteString("Статус: 🔒 запись закрыта\n")
@@ -200,6 +212,25 @@ func DeleteConfirm(title string) string {
 
 func Skipped(position int) string {
 	return fmt.Sprintf("Теперь ты %d-й", position)
+}
+
+func CarryPlan(p appqueue.CarryPlan) string {
+	var b strings.Builder
+
+	fmt.Fprintf(
+		&b, "Перенести %d чел. из «%s» в начало «%s»?\n",
+		len(p.Lines), html.EscapeString(p.From.Title), html.EscapeString(p.To.Title),
+	)
+
+	for _, line := range p.Lines {
+		fmt.Fprintf(&b, "\n%d. %s", line.Position, html.EscapeString(line.Name))
+	}
+
+	return b.String()
+}
+
+func Carried(count int) string {
+	return fmt.Sprintf("Перенесено: %d чел.", count)
 }
 
 func BotStarted(version string) string {

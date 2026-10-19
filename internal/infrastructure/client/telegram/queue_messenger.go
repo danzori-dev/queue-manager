@@ -150,7 +150,7 @@ func (m *QueueMessenger) AnnounceRemoval(ctx context.Context, removal appqueue.R
 func renderQueue(view appqueue.View) string {
 	var b strings.Builder
 
-	b.WriteString("<b>" + html.EscapeString(view.Event.Title) + "</b>\n")
+	fmt.Fprintf(&b, "<b>#%d %s</b>\n", view.Event.ID, html.EscapeString(view.Event.Title))
 
 	if view.Event.Status == domain.StatusClosed {
 		b.WriteString("🔒 Запись закрыта.\n")
