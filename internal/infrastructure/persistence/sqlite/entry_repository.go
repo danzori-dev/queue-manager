@@ -220,3 +220,54 @@ func (r *EntryRepository) SwapWithNext(ctx context.Context, eventID, userID int6
 
 	return nil
 }
+
+func (r *EntryRepository) Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		minKeyQuery = `
+			SELECT coalesce(min(sort_key), 1)
+			FROM queue_entries
+			WHERE event_id = ?
+		`
+
+		upsertQuery = `
+			INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT (event_id, user_id) DO UPDATE SET sort_key = excluded.sort_key
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var minKey int64
+
+	err = tx.
+		QueryRowContext(ctx, minKeyQuery, eventID).
+		Scan(&minKey)
+	if err != nil {
+		return fmt.Errorf("query min sort key: %w", err)
+	}
+
+	first := minKey - int64(len(entries))
+
+	for i, e := range entries {
+		if _, err := tx.ExecContext(ctx, upsertQuery, eventID, e.UserID, e.Username, first+int64(i)); err != nil {
+			return fmt.Errorf("upsert entry: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}

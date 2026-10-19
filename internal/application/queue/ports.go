@@ -23,6 +23,7 @@ type EntryRepository interface {
 	Position(ctx context.Context, eventID, userID int64) (int, error)
 	List(ctx context.Context, eventID int64) ([]domain.Entry, error)
 	SwapWithNext(ctx context.Context, eventID, userID int64) error
+	Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error
 }
 
 type TargetRepository interface {
@@ -55,6 +56,12 @@ type Line struct {
 	UserID   int64
 	Name     string
 	UserName string
+}
+
+type CarryPlan struct {
+	From  domain.Event
+	To    domain.Event
+	Lines []Line
 }
 
 type Removal struct {
