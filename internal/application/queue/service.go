@@ -255,6 +255,10 @@ func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration
 	}
 
 	retryAfter, err := s.messages.Edit(ctx, view)
+	if errors.Is(err, domain.ErrMessageNotFound) {
+		return 0, s.republish(ctx, view)
+	}
+
 	if err != nil {
 		return 0, err
 	}
@@ -285,6 +289,19 @@ func (s *Service) view(ctx context.Context, event domain.Event) (View, error) {
 		Event: event,
 		Lines: lines,
 	}, nil
+}
+
+func (s *Service) republish(ctx context.Context, view View) error {
+	messageID, err := s.messages.Publish(ctx, view)
+	if err != nil {
+		return fmt.Errorf("republish event: %w", err)
+	}
+
+	if err := s.events.SetMessageID(ctx, view.Event.ID, messageID); err != nil {
+		return fmt.Errorf("save message id: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) setStatus(ctx context.Context, eventID int64, status domain.Status) error {
