@@ -18,6 +18,7 @@ const (
 	ActionDelete        ActionKind = "delete"
 	ActionDeleteConfirm ActionKind = "delconfirm"
 	ActionKick          ActionKind = "kick"
+	ActionSkip          ActionKind = "skip"
 )
 
 type Action struct {

@@ -201,11 +201,18 @@ func queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 		Kind:    domain.ActionLeave,
 		EventID: view.Event.ID,
 	}
+	skip := domain.Action{
+		Kind:    domain.ActionSkip,
+		EventID: view.Event.ID,
+	}
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Встать в очередь").WithCallbackData(join.String()),
 			tu.InlineKeyboardButton("Выйти").WithCallbackData(leave.String()),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Пропустить место").WithCallbackData(skip.String()),
 		),
 	)
 }

@@ -79,6 +79,9 @@ const (
 	ParticipantRemoved  = "Студент убран из очереди."
 	ParticipantNotFound = "Этого студента уже нет в очереди."
 
+	SkipPressAgain = "Нажми еще раз в течение 5 секунд, чтобы пропустить одно место."
+	AlreadyLast    = "Ты и так последний."
+
 	BotStopped = "🟡 Бот остановлен."
 )
 
@@ -193,6 +196,10 @@ func DeleteConfirm(title string) string {
 		"Удалить очередь <b>%s</b>?\n\nСообщение очереди в группе и список участников будут удалены.",
 		html.EscapeString(title),
 	)
+}
+
+func Skipped(position int) string {
+	return fmt.Sprintf("Теперь ты %d-й", position)
 }
 
 func BotStarted(version string) string {

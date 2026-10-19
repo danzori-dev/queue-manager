@@ -32,6 +32,7 @@ type Handler struct {
 	admin      AdminService
 	students   StudentService
 	queue      QueueService
+	confirms   *confirmations
 	version    string
 	apiTimeout time.Duration
 	log        *slog.Logger
@@ -43,6 +44,7 @@ func New(d Deps) *Handler {
 		admin:      d.Admin,
 		students:   d.Students,
 		queue:      d.Queue,
+		confirms:   newConfirmations(),
 		version:    d.Version,
 		apiTimeout: d.APITimeout,
 		log:        d.Log,

@@ -27,6 +27,7 @@ type QueueService interface {
 	CreateEvent(ctx context.Context, title string) (domain.Event, error)
 	Join(ctx context.Context, eventID, userID int64, username string) (appqueue.JoinResult, error)
 	Leave(ctx context.Context, eventID, userID int64) (bool, error)
+	Skip(ctx context.Context, eventID, userID int64) (int, error)
 	OpenEventIDs(ctx context.Context) ([]int64, error)
 
 	Events(ctx context.Context) ([]domain.Event, error)
