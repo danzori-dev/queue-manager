@@ -16,6 +16,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/config"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/client/telegram"
 	logger "github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logger/slog"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/persistence/sqlite"
@@ -36,16 +37,27 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
+	notifier, err := telegram.NewOwnerNotifier(cfg.Telegram.Token, cfg.Telegram.OwnerID, cfg.Telegram.APITimeout)
+	if err != nil {
+		slog.ErrorContext(
+			ctx, "create owner notifier",
+			slog.Any("err", err),
+		)
+
+		return err
+	}
+
 	log := logger.New(
 		logger.Options{
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
 			Version: version(),
 			Secrets: []string{cfg.Telegram.Token, cfg.SQLite.AuthToken},
+			Alerts:  notifier,
 		},
 	)
 
-	if err := run(ctx, cfg, log); err != nil {
+	if err := run(ctx, cfg, log, notifier); err != nil {
 		log.ErrorContext(
 			ctx, "application stopped",
 			slog.Any("err", err),
@@ -54,10 +66,12 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
+	_ = notifier.Send(context.WithoutCancel(ctx), texts.BotStopped)
+
 	return nil
 }
 
-func run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *telegram.OwnerNotifier) error {
 	db, err := sqlite.Open(
 		ctx,
 		sqlite.Config{
@@ -166,6 +180,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 			Admin:      adminSvc,
 			Students:   studentSvc,
 			Queue:      queueSvc,
+			Version:    version(),
 			APITimeout: cfg.Telegram.APITimeout,
 			Log:        log,
 		},
@@ -192,6 +207,8 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		),
 		log,
 	)
+
+	_ = notifier.Send(ctx, texts.BotStarted(version()))
 
 	g, ctx := errgroup.WithContext(ctx)
 

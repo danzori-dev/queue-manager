@@ -33,6 +33,8 @@ func RegisterRoutes(p RouteParams) Register {
 
 		bh.HandleMessage(p.Handler.HandleHelp, th.CommandEqual("help"))
 
+		bh.HandleMyChatMember(p.Handler.HandleMyChatMember)
+
 		bh.HandleCallbackQuery(
 			p.Handler.HandleQueueCallback, th.AnyCallbackQueryWithMessage(),
 			actions(domain.ActionJoin, domain.ActionLeave),
@@ -62,6 +64,8 @@ func RegisterRoutes(p RouteParams) Register {
 		private.HandleMessage(p.Handler.HandleStudents, th.CommandEqual("students"))
 		private.HandleMessage(p.Handler.HandleImportStudents, th.CaptionCommandEqual("import_students"))
 		private.HandleMessage(p.Handler.HandleImportStudents, th.CommandEqual("import_students"))
+
+		private.HandleMessage(p.Handler.HandleStatus, th.CommandEqual("status"))
 	}
 }
 

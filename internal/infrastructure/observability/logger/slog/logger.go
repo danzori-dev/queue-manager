@@ -18,6 +18,7 @@ type Options struct {
 	Format  Format
 	Version string
 	Secrets []string
+	Alerts  AlertSender
 }
 
 func New(opts Options) *slog.Logger {
@@ -32,6 +33,13 @@ func New(opts Options) *slog.Logger {
 		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
 	} else {
 		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
+	}
+
+	if opts.Alerts != nil {
+		handler = &alertHandler{
+			next:   handler,
+			sender: opts.Alerts,
+		}
 	}
 
 	return slog.New(newContextHandler(handler)).With(slog.String("version", opts.Version))

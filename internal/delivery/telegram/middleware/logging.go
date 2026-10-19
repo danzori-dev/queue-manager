@@ -13,7 +13,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/application/logctx"
 )
 
-const slowUpdate = time.Second
+const slowUpdate = 2 * time.Second
 
 func Logging(log *slog.Logger) th.Handler {
 	return func(ctx *th.Context, update telego.Update) error {
