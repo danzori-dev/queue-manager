@@ -138,3 +138,85 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 
 	return entries, nil
 }
+
+func (r *EntryRepository) SwapWithNext(ctx context.Context, eventID, userID int64) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		keyQuery = `
+			SELECT sort_key
+			FROM queue_entries
+			WHERE event_id = ? AND user_id = ?
+		`
+
+		nextQuery = `
+			SELECT id, sort_key
+			FROM queue_entries
+			WHERE event_id = ? AND sort_key > ?
+			ORDER BY sort_key
+			LIMIT 1
+		`
+
+		setKeyByUser = `
+			UPDATE queue_entries
+			SET sort_key = ?
+			WHERE event_id = ? AND user_id = ?
+		`
+
+		setKeyByID = `
+			UPDATE queue_entries
+			SET sort_key = ?
+			WHERE id = ?
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var key int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, userID).
+		Scan(&key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query entry: %w", err)
+	}
+
+	var nextID, nextKey int64
+
+	err = tx.
+		QueryRowContext(ctx, nextQuery, eventID, key).
+		Scan(&nextID, &nextKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrLastInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query next entry: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, setKeyByUser, nextKey, eventID, userID); err != nil {
+		return fmt.Errorf("move entry down: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, setKeyByID, key, nextID); err != nil {
+		return fmt.Errorf("move next entry up: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}

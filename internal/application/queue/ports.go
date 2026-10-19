@@ -22,6 +22,7 @@ type EntryRepository interface {
 	Remove(ctx context.Context, eventID, userID int64) (bool, error)
 	Position(ctx context.Context, eventID, userID int64) (int, error)
 	List(ctx context.Context, eventID int64) ([]domain.Entry, error)
+	SwapWithNext(ctx context.Context, eventID, userID int64) error
 }
 
 type TargetRepository interface {

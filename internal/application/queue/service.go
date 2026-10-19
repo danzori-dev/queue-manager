@@ -153,6 +153,30 @@ func (s *Service) Leave(ctx context.Context, eventID, userID int64) (bool, error
 	return removed, nil
 }
 
+func (s *Service) Skip(ctx context.Context, eventID, userID int64) (int, error) {
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := event.CanJoin(); err != nil {
+		return 0, err
+	}
+
+	if err := s.entries.SwapWithNext(ctx, eventID, userID); err != nil {
+		return 0, fmt.Errorf("swap with next: %w", err)
+	}
+
+	s.scheduler.Schedule(eventID)
+
+	position, err := s.entries.Position(ctx, eventID, userID)
+	if err != nil {
+		return 0, fmt.Errorf("get position: %w", err)
+	}
+
+	return position, nil
+}
+
 func (s *Service) OpenEventIDs(ctx context.Context) ([]int64, error) {
 	ids, err := s.events.ListOpenIDs(ctx)
 	if err != nil {
