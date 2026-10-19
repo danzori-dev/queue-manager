@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"strings"
+	"time"
 
 	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -21,6 +22,7 @@ const (
 		"<code>/new &lt;название&gt;</code> - создать очередь\n" +
 		"<code>/events</code> - управление очередями"
 	HelpOwner = "<b>Владелец:</b>\n\n" +
+		"<code>/status</code> - состояние бота\n" +
 		"<code>/addadmin &lt;user_id&gt;</code> - назначить администратора\n" +
 		"<code>/rmadmin &lt;user_id&gt;</code> - удалить администратора\n" +
 		"<code>/admins</code> - список администраторов\n" +
@@ -195,4 +197,27 @@ func DeleteConfirm(title string) string {
 
 func BotStarted(version string) string {
 	return fmt.Sprintf("🟢 Бот запущен.\nВерсия: %s", version)
+}
+
+type BotStatus struct {
+	Version    string
+	DBLatency  time.Duration
+	DBErr      error
+	OpenEvents int
+}
+
+func Status(s BotStatus) string {
+	var b strings.Builder
+
+	b.WriteString("<b>Состояние бота:</b>\n\n")
+	fmt.Fprintf(&b, "Версия: <code>%s</code>\n", html.EscapeString(s.Version))
+
+	if s.DBErr != nil {
+		fmt.Fprintf(&b, "База: недоступна (<code>%s</code>)\n", html.EscapeString(s.DBErr.Error()))
+	} else {
+		fmt.Fprintf(&b, "База: отвечает, %d мс\n", s.DBLatency.Milliseconds())
+		fmt.Fprintf(&b, "Открытых очередей: %d\n", s.OpenEvents)
+	}
+
+	return b.String()
 }

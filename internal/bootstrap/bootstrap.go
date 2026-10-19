@@ -180,6 +180,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 			Admin:      adminSvc,
 			Students:   studentSvc,
 			Queue:      queueSvc,
+			Version:    version(),
 			APITimeout: cfg.Telegram.APITimeout,
 			Log:        log,
 		},

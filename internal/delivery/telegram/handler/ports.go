@@ -21,11 +21,13 @@ type StudentService interface {
 	Count() int
 }
 
+//nolint:interfacebloat // mirrors the queue service used by the handlers
 type QueueService interface {
 	SetQueueTopic(ctx context.Context, chatID int64, threadID int) (bool, error)
 	CreateEvent(ctx context.Context, title string) (domain.Event, error)
 	Join(ctx context.Context, eventID, userID int64, username string) (appqueue.JoinResult, error)
 	Leave(ctx context.Context, eventID, userID int64) (bool, error)
+	OpenEventIDs(ctx context.Context) ([]int64, error)
 
 	Events(ctx context.Context) ([]domain.Event, error)
 	EventView(ctx context.Context, eventID int64) (appqueue.View, error)

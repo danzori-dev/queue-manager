@@ -22,6 +22,7 @@ type Deps struct {
 	Admin      AdminService
 	Students   StudentService
 	Queue      QueueService
+	Version    string
 	APITimeout time.Duration
 	Log        *slog.Logger
 }
@@ -31,6 +32,7 @@ type Handler struct {
 	admin      AdminService
 	students   StudentService
 	queue      QueueService
+	version    string
 	apiTimeout time.Duration
 	log        *slog.Logger
 }
@@ -41,6 +43,7 @@ func New(d Deps) *Handler {
 		admin:      d.Admin,
 		students:   d.Students,
 		queue:      d.Queue,
+		version:    d.Version,
 		apiTimeout: d.APITimeout,
 		log:        d.Log,
 	}
