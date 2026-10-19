@@ -76,6 +76,8 @@ const (
 
 	ParticipantRemoved  = "Студент убран из очереди."
 	ParticipantNotFound = "Этого студента уже нет в очереди."
+
+	BotStopped = "🟡 Бот остановлен."
 )
 
 func Help(sections ...string) string {
@@ -189,4 +191,8 @@ func DeleteConfirm(title string) string {
 		"Удалить очередь <b>%s</b>?\n\nСообщение очереди в группе и список участников будут удалены.",
 		html.EscapeString(title),
 	)
+}
+
+func BotStarted(version string) string {
+	return fmt.Sprintf("🟢 Бот запущен.\nВерсия: %s", version)
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/config"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/client/telegram"
 	logger "github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logger/slog"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/persistence/sqlite"
@@ -56,7 +57,7 @@ func Run(ctx context.Context) error {
 		},
 	)
 
-	if err := run(ctx, cfg, log); err != nil {
+	if err := run(ctx, cfg, log, notifier); err != nil {
 		log.ErrorContext(
 			ctx, "application stopped",
 			slog.Any("err", err),
@@ -65,10 +66,12 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
+	_ = notifier.Send(context.WithoutCancel(ctx), texts.BotStopped)
+
 	return nil
 }
 
-func run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *telegram.OwnerNotifier) error {
 	db, err := sqlite.Open(
 		ctx,
 		sqlite.Config{
@@ -203,6 +206,8 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		),
 		log,
 	)
+
+	_ = notifier.Send(ctx, texts.BotStarted(version()))
 
 	g, ctx := errgroup.WithContext(ctx)
 
