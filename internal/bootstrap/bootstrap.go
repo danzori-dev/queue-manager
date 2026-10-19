@@ -36,12 +36,23 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
+	notifier, err := telegram.NewOwnerNotifier(cfg.Telegram.Token, cfg.Telegram.OwnerID, cfg.Telegram.APITimeout)
+	if err != nil {
+		slog.ErrorContext(
+			ctx, "create owner notifier",
+			slog.Any("err", err),
+		)
+
+		return err
+	}
+
 	log := logger.New(
 		logger.Options{
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
 			Version: version(),
 			Secrets: []string{cfg.Telegram.Token, cfg.SQLite.AuthToken},
+			Alerts:  notifier,
 		},
 	)
 
