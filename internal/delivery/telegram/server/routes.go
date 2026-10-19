@@ -33,6 +33,8 @@ func RegisterRoutes(p RouteParams) Register {
 
 		bh.HandleMessage(p.Handler.HandleHelp, th.CommandEqual("help"))
 
+		bh.HandleMyChatMember(p.Handler.HandleMyChatMember)
+
 		bh.HandleCallbackQuery(
 			p.Handler.HandleQueueCallback, th.AnyCallbackQueryWithMessage(),
 			actions(domain.ActionJoin, domain.ActionLeave),
