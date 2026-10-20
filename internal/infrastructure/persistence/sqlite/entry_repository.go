@@ -271,3 +271,69 @@ func (r *EntryRepository) Prepend(ctx context.Context, eventID int64, entries []
 
 	return nil
 }
+
+func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, userB int64) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		keyQuery = `
+			SELECT sort_key
+			FROM queue_entries
+			WHERE event_id = ? AND user_id = ?
+		`
+
+		setKeyQuery = `
+			UPDATE queue_entries
+			SET sort_key = ?
+			WHERE event_id = ? AND user_id = ?
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var keyA, keyB int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, userA).
+		Scan(&keyA)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query first entry: %w", err)
+	}
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, userB).
+		Scan(&keyB)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query second entry: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, setKeyQuery, keyB, eventID, userA); err != nil {
+		return fmt.Errorf("update first entry: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, setKeyQuery, keyA, eventID, userB); err != nil {
+		return fmt.Errorf("update second entry: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}

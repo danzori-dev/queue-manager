@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -18,22 +19,25 @@ import (
 )
 
 type QueueMessengerDeps struct {
-	Bot        *telego.Bot
-	APITimeout time.Duration
-	Log        *slog.Logger
+	Bot         *telego.Bot
+	BotUsername string
+	APITimeout  time.Duration
+	Log         *slog.Logger
 }
 
 type QueueMessenger struct {
-	bot        *telego.Bot
-	apiTimeout time.Duration
-	log        *slog.Logger
+	bot         *telego.Bot
+	botUsername string
+	apiTimeout  time.Duration
+	log         *slog.Logger
 }
 
 func NewQueueMessenger(d QueueMessengerDeps) *QueueMessenger {
 	return &QueueMessenger{
-		bot:        d.Bot,
-		apiTimeout: d.APITimeout,
-		log:        d.Log,
+		bot:         d.Bot,
+		botUsername: d.BotUsername,
+		apiTimeout:  d.APITimeout,
+		log:         d.Log,
 	}
 }
 
@@ -44,7 +48,7 @@ func (m *QueueMessenger) Publish(ctx context.Context, view appqueue.View) (int, 
 	params := tu.Message(tu.ID(view.Event.ChatID), renderQueue(view)).
 		WithParseMode(telego.ModeHTML).
 		WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true}).
-		WithReplyMarkup(queueKeyboard(view))
+		WithReplyMarkup(m.queueKeyboard(view))
 
 	if view.Event.ThreadID != 0 {
 		params = params.WithMessageThreadID(view.Event.ThreadID)
@@ -65,7 +69,7 @@ func (m *QueueMessenger) Edit(ctx context.Context, view appqueue.View) (time.Dur
 	params := tu.EditMessageText(tu.ID(view.Event.ChatID), view.Event.MessageID, renderQueue(view)).
 		WithParseMode(telego.ModeHTML).
 		WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true}).
-		WithReplyMarkup(queueKeyboard(view))
+		WithReplyMarkup(m.queueKeyboard(view))
 
 	if _, err := m.bot.EditMessageText(reqCtx, params); err != nil {
 		apiErr, ok := errors.AsType[*ta.Error](err)
@@ -147,6 +151,26 @@ func (m *QueueMessenger) AnnounceRemoval(ctx context.Context, removal appqueue.R
 	}
 }
 
+func (m *QueueMessenger) AskSwap(ctx context.Context, ask appqueue.SwapAsk) (int, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
+	defer cancel()
+
+	params := tu.Message(tu.ID(ask.Request.ToID), renderSwapAsk(ask)).
+		WithParseMode(telego.ModeHTML).
+		WithReplyMarkup(swapKeyboard(ask.Request.ID))
+
+	msg, err := m.bot.SendMessage(reqCtx, params)
+	if err != nil {
+		if apiErr, ok := errors.AsType[*ta.Error](err); ok && apiErr.ErrorCode == http.StatusForbidden {
+			return 0, domain.ErrSwapUnreachable
+		}
+
+		return 0, fmt.Errorf("send swap request: %w", err)
+	}
+
+	return msg.MessageID, nil
+}
+
 func renderQueue(view appqueue.View) string {
 	var b strings.Builder
 
@@ -188,7 +212,19 @@ func renderRemoval(r appqueue.Removal) string {
 	)
 }
 
-func queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
+func renderSwapAsk(ask appqueue.SwapAsk) string {
+	r := ask.Request
+
+	return fmt.Sprintf(
+		"%s предлагает поменяться с тобой местами в очереди «%s».\n\n"+
+			"Твое место - %d\nМесто %s - %d\n\n"+
+			"Запрос действует %d минут.",
+		html.EscapeString(ask.FromName), html.EscapeString(r.Event.Title),
+		r.ToPos, html.EscapeString(ask.FromName), r.FromPos, int(domain.SwapTTL.Minutes()),
+	)
+}
+
+func (m *QueueMessenger) queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 	if view.Event.Status == domain.StatusClosed {
 		return &telego.InlineKeyboardMarkup{InlineKeyboard: [][]telego.InlineKeyboardButton{}}
 	}
@@ -206,6 +242,8 @@ func queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 		EventID: view.Event.ID,
 	}
 
+	swapURL := fmt.Sprintf("https://t.me/%s?start=swap_%d", m.botUsername, view.Event.ID)
+
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Встать в очередь").WithCallbackData(join.String()),
@@ -213,6 +251,25 @@ func queueKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Пропустить место").WithCallbackData(skip.String()),
+			tu.InlineKeyboardButton("Поменяться местами").WithURL(swapURL),
+		),
+	)
+}
+
+func swapKeyboard(requestID int64) *telego.InlineKeyboardMarkup {
+	accept := domain.Action{
+		Kind:    domain.ActionSwapAccept,
+		EventID: requestID,
+	}
+	decline := domain.Action{
+		Kind:    domain.ActionSwapDecline,
+		EventID: requestID,
+	}
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Принять").WithCallbackData(accept.String()),
+			tu.InlineKeyboardButton("Отклонить").WithCallbackData(decline.String()),
 		),
 	)
 }

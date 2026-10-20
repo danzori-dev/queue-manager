@@ -24,6 +24,7 @@ type EntryRepository interface {
 	List(ctx context.Context, eventID int64) ([]domain.Entry, error)
 	SwapWithNext(ctx context.Context, eventID, userID int64) error
 	Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error
+	SwapSortKeys(ctx context.Context, eventID, userA, userB int64) error
 }
 
 type TargetRepository interface {
@@ -40,6 +41,7 @@ type Messenger interface {
 	Edit(ctx context.Context, view View) (time.Duration, error)
 	Delete(ctx context.Context, event domain.Event)
 	AnnounceRemoval(ctx context.Context, removal Removal)
+	AskSwap(ctx context.Context, ask SwapAsk) (int, error)
 }
 
 type RenderScheduler interface {
@@ -69,4 +71,10 @@ type Removal struct {
 	ActorName string
 	UserID    int64
 	UserName  string
+}
+
+type SwapAsk struct {
+	Request  domain.SwapRequest
+	FromName string
+	ToName   string
 }
