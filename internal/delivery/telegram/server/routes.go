@@ -37,13 +37,21 @@ func RegisterRoutes(p RouteParams) Register {
 
 		bh.HandleCallbackQuery(
 			p.Handler.HandleQueueCallback, th.AnyCallbackQueryWithMessage(),
-			actions(domain.ActionJoin, domain.ActionLeave),
+			actions(domain.ActionJoin, domain.ActionLeave, domain.ActionSkip),
 		)
 		bh.HandleCallbackQuery(
 			p.Handler.HandleMenuCallback, th.AnyCallbackQueryWithMessage(),
 			actions(
 				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
 				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick,
+				domain.ActionCarry, domain.ActionCarryCancel,
+			),
+		)
+		bh.HandleCallbackQuery(
+			p.Handler.HandleSwapCallback, th.AnyCallbackQueryWithMessage(),
+			actions(
+				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapSend, domain.ActionSwapAbort,
+				domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
 			),
 		)
 
@@ -56,6 +64,9 @@ func RegisterRoutes(p RouteParams) Register {
 		private.HandleMessage(p.Handler.HandleStart, th.CommandEqual("start"))
 		private.HandleMessage(p.Handler.HandleNew, th.CommandEqual("new"))
 		private.HandleMessage(p.Handler.HandleEvents, th.CommandEqual("events"))
+		private.HandleMessage(p.Handler.HandleCarry, th.CommandEqual("carry"))
+
+		private.HandleMessage(p.Handler.HandleSwap, th.CommandEqual("swap"))
 
 		private.HandleMessage(p.Handler.HandleAddAdmin, th.CommandEqual("addadmin"))
 		private.HandleMessage(p.Handler.HandleRmAdmin, th.CommandEqual("rmadmin"))

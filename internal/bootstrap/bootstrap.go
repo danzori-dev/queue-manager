@@ -148,9 +148,10 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	queueMessenger := telegram.NewQueueMessenger(
 		telegram.QueueMessengerDeps{
-			Bot:        bot,
-			APITimeout: cfg.Telegram.APITimeout,
-			Log:        log,
+			Bot:         bot,
+			BotUsername: me.Username,
+			APITimeout:  cfg.Telegram.APITimeout,
+			Log:         log,
 		},
 	)
 
@@ -180,6 +181,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 			Admin:      adminSvc,
 			Students:   studentSvc,
 			Queue:      queueSvc,
+			Swaps:      queueSvc,
 			Version:    version(),
 			APITimeout: cfg.Telegram.APITimeout,
 			Log:        log,

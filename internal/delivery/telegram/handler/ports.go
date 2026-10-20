@@ -27,6 +27,7 @@ type QueueService interface {
 	CreateEvent(ctx context.Context, title string) (domain.Event, error)
 	Join(ctx context.Context, eventID, userID int64, username string) (appqueue.JoinResult, error)
 	Leave(ctx context.Context, eventID, userID int64) (bool, error)
+	Skip(ctx context.Context, eventID, userID int64) (int, error)
 	OpenEventIDs(ctx context.Context) ([]int64, error)
 
 	Events(ctx context.Context) ([]domain.Event, error)
@@ -35,4 +36,16 @@ type QueueService interface {
 	OpenEvent(ctx context.Context, eventID int64) error
 	RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
 	DeleteEvent(ctx context.Context, eventID int64) error
+
+	PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (appqueue.CarryPlan, error)
+	Carry(ctx context.Context, fromID int64, fromPos int, toID int64) (int, error)
+}
+
+type SwapService interface {
+	SwapTargets(ctx context.Context, userID int64) ([]domain.Event, error)
+	SwapCandidates(ctx context.Context, eventID, userID int64) (appqueue.View, error)
+	RequestSwap(ctx context.Context, eventID, fromID, toID int64, fromMessageID int) (domain.SwapRequest, error)
+	AcceptSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
+	DeclineSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
+	CancelSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
 }

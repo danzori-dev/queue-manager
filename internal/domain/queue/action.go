@@ -18,6 +18,16 @@ const (
 	ActionDelete        ActionKind = "delete"
 	ActionDeleteConfirm ActionKind = "delconfirm"
 	ActionKick          ActionKind = "kick"
+	ActionSkip          ActionKind = "skip"
+	ActionCarry         ActionKind = "carry"
+	ActionCarryCancel   ActionKind = "carrycancel"
+	ActionSwapEvent     ActionKind = "swapevent"
+	ActionSwapPick      ActionKind = "swappick"
+	ActionSwapSend      ActionKind = "swapsend"
+	ActionSwapAbort     ActionKind = "swapabort"
+	ActionSwapAccept    ActionKind = "swapaccept"
+	ActionSwapDecline   ActionKind = "swapdecline"
+	ActionSwapCancel    ActionKind = "swapcancel"
 )
 
 type Action struct {
@@ -27,11 +37,20 @@ type Action struct {
 }
 
 func (a Action) String() string {
-	if a.Kind == ActionKick {
+	if a.Kind.hasUserID() {
 		return fmt.Sprintf("%s:%d:%d", a.Kind, a.EventID, a.UserID)
 	}
 
 	return fmt.Sprintf("%s:%d", a.Kind, a.EventID)
+}
+
+func (k ActionKind) hasUserID() bool {
+	switch k {
+	case ActionKick, ActionSwapPick, ActionSwapSend:
+		return true
+	default:
+		return false
+	}
 }
 
 func ParseAction(s string) (Action, error) {
@@ -40,7 +59,7 @@ func ParseAction(s string) (Action, error) {
 
 	a := Action{Kind: ActionKind(kind)}
 
-	if hasUserID != (a.Kind == ActionKick) {
+	if hasUserID != a.Kind.hasUserID() {
 		return Action{}, ErrUnknownAction
 	}
 

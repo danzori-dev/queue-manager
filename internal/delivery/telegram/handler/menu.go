@@ -92,6 +92,12 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 			return texts.EventDeletedAnswer, h.editMenu(ctx, query, texts.EventDeleted, backKeyboard())
 		}
 
+	case domain.ActionCarry:
+		return h.confirmCarry(ctx, query, a.EventID)
+
+	case domain.ActionCarryCancel:
+		return h.cancelCarry(ctx, query, a.EventID)
+
 	default:
 		return "", domain.ErrUnknownAction
 	}
@@ -150,7 +156,7 @@ func eventsKeyboard(events []domain.Event) *telego.InlineKeyboardMarkup {
 	rows := make([][]telego.InlineKeyboardButton, 0, len(events))
 
 	for _, e := range events {
-		label := e.Title
+		label := fmt.Sprintf("#%d %s", e.ID, e.Title)
 		if e.Status == domain.StatusClosed {
 			label = "🔒 " + label
 		}
