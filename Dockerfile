@@ -10,14 +10,11 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 
 COPY . .
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath  \
+RUN CGO_ENABLED=0 go build -trimpath  \
     -ldflags="-s -w -X github.com/danzori-dev/queue-manager/internal/bootstrap.buildVersion=${VERSION}" \
     -o /out/queuemanager ./cmd/queuemanager
 
@@ -25,9 +22,7 @@ FROM golang:${GO_VERSION}-alpine AS goose
 
 ARG GOOSE_VERSION
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOBIN=/out go install -trimpath -ldflags="-s -w" \
+RUN CGO_ENABLED=0 GOBIN=/out go install -trimpath -ldflags="-s -w" \
     github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 FROM alpine:${ALPINE_VERSION} AS migrate
