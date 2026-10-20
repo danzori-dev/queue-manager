@@ -22,6 +22,7 @@ type Deps struct {
 	Admin      AdminService
 	Students   StudentService
 	Queue      QueueService
+	Swaps      SwapService
 	Version    string
 	APITimeout time.Duration
 	Log        *slog.Logger
@@ -32,6 +33,7 @@ type Handler struct {
 	admin      AdminService
 	students   StudentService
 	queue      QueueService
+	swaps      SwapService
 	confirms   *confirmations
 	carries    *carryDrafts
 	version    string
@@ -45,6 +47,7 @@ func New(d Deps) *Handler {
 		admin:      d.Admin,
 		students:   d.Students,
 		queue:      d.Queue,
+		swaps:      d.Swaps,
 		confirms:   newConfirmations(),
 		carries:    newCarryDrafts(),
 		version:    d.Version,

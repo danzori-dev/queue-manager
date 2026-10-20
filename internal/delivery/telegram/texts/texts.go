@@ -16,7 +16,8 @@ const (
 		"Используй /help, чтобы посмотреть список доступных команд."
 
 	HelpCommon = "<b>Команды:</b>\n\n" +
-		"<code>/help</code> - показать эту справку"
+		"<code>/help</code> - показать эту справку\n" +
+		"<code>/swap</code> - предложить поменяться местами в очереди"
 	HelpAdmin = "<b>Администратор:</b>\n\n" +
 		"<code>/settopic</code> - назначить топик, в котором будут публиковаться очереди (написать в самом топике)\n" +
 		"<code>/new &lt;название&gt;</code> - создать очередь\n" +
@@ -75,6 +76,8 @@ const (
 	ButtonCancel        = "Отмена"
 	ButtonBack          = "<- К списку"
 	ButtonCarry         = "Перенести"
+	ButtonSwapSend      = "Отправить запрос"
+	ButtonSwapCancel    = "Отменить запрос"
 
 	EventClosedAnswer  = "Запись закрыта."
 	EventOpenedAnswer  = "Запись открыта."
@@ -93,6 +96,21 @@ const (
 	CarryExpired      = "Перенос устарел, отправьте /carry еще раз."
 	CarryCanceled     = "Перенос отменен."
 	CarryDoneAnswer   = "Готово. Перенос выполнен."
+
+	SwapNotQueues   = "Ты не стоишь ни в одной открытой очереди."
+	SwapChooseQueue = "Выбери очередь, в которой хочешь поменяться местами:"
+	SwapNobody      = "В этой очереди больше никого нет."
+	SwapNotInQueue  = "Кого-то из вас уже нет в этой очереди."
+	SwapUnreachable = "Бот не может написать этому человеку: он еще не запускал бота.\n" +
+		"Попроси его открыть бота и нажать «Старт» или отправить <code>/start</code>, потом отправь запрос снова."
+	SwapSelf     = "Нельзя поменяться с самим собой."
+	SwapBusy     = "У тебя или у этого человека уже есть активный запрос на обмен."
+	SwapAborted  = "Отменено."
+	SwapNotYours = "Это не твой запрос."
+	SwapGone     = "Запрос уже неактуален."
+	SwapChanged  = "Очередь изменилась, обмен не выполнен."
+	SwapDeclined = "Запрос отклонен."
+	SwapCanceled = "Запрос отменен."
 
 	BotStopped = "🟡 Бот остановлен."
 )
@@ -231,6 +249,49 @@ func CarryPlan(p appqueue.CarryPlan) string {
 
 func Carried(count int) string {
 	return fmt.Sprintf("Перенесено: %d чел.", count)
+}
+
+func SwapChoosePerson(eventID int64, title string) string {
+	return fmt.Sprintf("<b>#%d %s</b>\nС кем поменяться?", eventID, html.EscapeString(title))
+}
+
+func SwapConfirm(title string, myPos int, otherName string, otherPos int) string {
+	return fmt.Sprintf(
+		"Обмен местами в очереди «%s»:\n\nТвое место - %d\nМесто %s - %d\n\nОтправить запрос?",
+		html.EscapeString(title), myPos, html.EscapeString(otherName), otherPos,
+	)
+}
+
+func SwapSent(name string) string {
+	return fmt.Sprintf(
+		"Запрос отправлен студенту - %s. Дедлайн на ответ 10 минут.",
+		html.EscapeString(name),
+	)
+}
+
+func SwapAcceptedForAddressee(newPos int) string {
+	return fmt.Sprintf("Обмен выполнен.\nТвое новое место - %d.", newPos)
+}
+
+func SwapAcceptedForInitiator(name, title string, newPos int) string {
+	return fmt.Sprintf(
+		"%s принимает обмен в очереди «%s».\nТвое новое место: %d.",
+		html.EscapeString(name), html.EscapeString(title), newPos,
+	)
+}
+
+func SwapDeclinedForInitiator(name, title string) string {
+	return fmt.Sprintf(
+		"%s отклоняет обмен местами в очереди «%s».",
+		html.EscapeString(name), html.EscapeString(title),
+	)
+}
+
+func SwapFailedForInitiator(title string) string {
+	return fmt.Sprintf(
+		"Обмен в очереди «%s» не выполнен: очередь изменилась. Отправь запрос заново.",
+		html.EscapeString(title),
+	)
 }
 
 func BotStarted(version string) string {

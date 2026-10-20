@@ -47,6 +47,13 @@ func RegisterRoutes(p RouteParams) Register {
 				domain.ActionCarry, domain.ActionCarryCancel,
 			),
 		)
+		bh.HandleCallbackQuery(
+			p.Handler.HandleSwapCallback, th.AnyCallbackQueryWithMessage(),
+			actions(
+				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapSend, domain.ActionSwapAbort,
+				domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
+			),
+		)
 
 		group := bh.Group(groupChat)
 
@@ -58,6 +65,8 @@ func RegisterRoutes(p RouteParams) Register {
 		private.HandleMessage(p.Handler.HandleNew, th.CommandEqual("new"))
 		private.HandleMessage(p.Handler.HandleEvents, th.CommandEqual("events"))
 		private.HandleMessage(p.Handler.HandleCarry, th.CommandEqual("carry"))
+
+		private.HandleMessage(p.Handler.HandleSwap, th.CommandEqual("swap"))
 
 		private.HandleMessage(p.Handler.HandleAddAdmin, th.CommandEqual("addadmin"))
 		private.HandleMessage(p.Handler.HandleRmAdmin, th.CommandEqual("rmadmin"))

@@ -40,3 +40,12 @@ type QueueService interface {
 	PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (appqueue.CarryPlan, error)
 	Carry(ctx context.Context, fromID int64, fromPos int, toID int64) (int, error)
 }
+
+type SwapService interface {
+	SwapTargets(ctx context.Context, userID int64) ([]domain.Event, error)
+	SwapCandidates(ctx context.Context, eventID, userID int64) (appqueue.View, error)
+	RequestSwap(ctx context.Context, eventID, fromID, toID int64, fromMessageID int) (domain.SwapRequest, error)
+	AcceptSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
+	DeclineSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
+	CancelSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error)
+}
