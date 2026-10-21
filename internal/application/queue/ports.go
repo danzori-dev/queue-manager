@@ -15,6 +15,7 @@ type EventRepository interface {
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	Delete(ctx context.Context, eventID int64) error
+	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
 }
 
 type EntryRepository interface {
