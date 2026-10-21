@@ -27,3 +27,7 @@ render:
 log:
     level: "${LOG_LEVEL:-info}"
     format: "${LOG_FORMAT:-json}"
+
+cleanup:
+    retention: "${CLEANUP_RETENTION:-720h}"
+    interval: "${CLEANUP_INTERVAL:-24h}"

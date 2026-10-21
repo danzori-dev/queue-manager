@@ -10,6 +10,7 @@ type Config struct {
 	SQLite   SQLite   `yaml:"sqlite"`
 	Render   Render   `yaml:"render"`
 	Log      Log      `yaml:"log"`
+	Cleanup  Cleanup  `yaml:"cleanup"`
 }
 
 type Telegram struct {
@@ -50,4 +51,9 @@ type Render struct {
 type Log struct {
 	Level  slog.Level `yaml:"level"`
 	Format string     `validate:"required,oneof=json text" yaml:"format"`
+}
+
+type Cleanup struct {
+	Retention time.Duration `validate:"required,gt=0" yaml:"retention"`
+	Interval  time.Duration `validate:"required,gt=0" yaml:"interval"`
 }
