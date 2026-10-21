@@ -10,6 +10,7 @@ require (
 	github.com/mymmrac/telego v1.12.1
 	github.com/tursodatabase/libsql-client-go v0.0.0-20260528064733-9d5d30a29a60
 	golang.org/x/sync v0.24.0
+	golang.org/x/time v0.16.0
 )
 
 require (

@@ -31,8 +31,9 @@ const (
 		"<code>/students</code> - список студентов\n" +
 		"<code>/import_students</code> - загрузить список студентов"
 
-	InternalError = "Что-то пошло не так, попробуй ещё раз."
-	AccessDenied  = "Нет доступа."
+	InternalError   = "Что-то пошло не так, попробуй ещё раз."
+	AccessDenied    = "Нет доступа."
+	TooManyRequests = "Слишком часто, попробуй чуть позже."
 
 	StudentsNotLoaded = "Сначала загрузите список студентов: <code>/import_students</code>."
 

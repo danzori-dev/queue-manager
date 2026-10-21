@@ -1,0 +1,64 @@
+package middleware
+
+import (
+	"context"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/mymmrac/telego"
+	th "github.com/mymmrac/telego/telegohandler"
+	tu "github.com/mymmrac/telego/telegoutil"
+	"golang.org/x/time/rate"
+
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
+	"github.com/danzori-dev/queue-manager/internal/domain/access"
+)
+
+type RateLimitConfig struct {
+	Burst    int
+	Interval time.Duration
+}
+
+func RateLimit(cfg RateLimitConfig, bot *telego.Bot, apiTimeout time.Duration, log *slog.Logger) th.Handler {
+	var (
+		mu       sync.Mutex
+		limiters = make(map[int64]*rate.Limiter)
+	)
+
+	allow := func(userID int64) bool {
+		mu.Lock()
+		defer mu.Unlock()
+
+		limiter, ok := limiters[userID]
+		if !ok {
+			limiter = rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst)
+			limiters[userID] = limiter
+		}
+
+		return limiter.Allow()
+	}
+
+	return func(ctx *th.Context, update telego.Update) error {
+		userID := extractUserID(update)
+
+		if userID == 0 || update.MyChatMember != nil || RoleFromContext(ctx).AtLeast(access.RoleOwner) {
+			return ctx.Next(update)
+		}
+
+		if allow(userID) {
+			return ctx.Next(update)
+		}
+
+		log.DebugContext(ctx, "rate limited")
+
+		if update.CallbackQuery != nil {
+			reqCtx, cancel := context.WithTimeout(ctx, apiTimeout)
+			defer cancel()
+
+			_ = bot.AnswerCallbackQuery(reqCtx, tu.CallbackQuery(update.CallbackQuery.ID).WithText(texts.TooManyRequests))
+		}
+
+		return nil
+	}
+}

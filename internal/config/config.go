@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	Telegram Telegram `yaml:"telegram"`
-	SQLite   SQLite   `yaml:"sqlite"`
-	Render   Render   `yaml:"render"`
-	Log      Log      `yaml:"log"`
-	Cleanup  Cleanup  `yaml:"cleanup"`
+	Telegram  Telegram  `yaml:"telegram"`
+	SQLite    SQLite    `yaml:"sqlite"`
+	Render    Render    `yaml:"render"`
+	Log       Log       `yaml:"log"`
+	Cleanup   Cleanup   `yaml:"cleanup"`
+	RateLimit RateLimit `yaml:"rate_limit"`
 }
 
 type Telegram struct {
@@ -56,4 +57,9 @@ type Log struct {
 type Cleanup struct {
 	Retention time.Duration `validate:"required,gt=0" yaml:"retention"`
 	Interval  time.Duration `validate:"required,gt=0" yaml:"interval"`
+}
+
+type RateLimit struct {
+	Burst    int           `validate:"required,gte=1" yaml:"burst"`
+	Interval time.Duration `validate:"required,gt=0"  yaml:"interval"`
 }
