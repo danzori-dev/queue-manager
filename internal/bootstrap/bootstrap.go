@@ -17,6 +17,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
+	"github.com/danzori-dev/queue-manager/internal/infrastructure/cache/memory"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/client/telegram"
 	logger "github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logger/slog"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/persistence/sqlite"
@@ -142,7 +143,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 		log.WarnContext(ctx, "student list is empty, send a JSON file with /import_students")
 	}
 
-	eventRepo := sqlite.NewEventRepository(db, cfg.SQLite.QueryTimeout)
+	eventRepo := memory.NewEventCache(sqlite.NewEventRepository(db, cfg.SQLite.QueryTimeout))
 	entryRepo := sqlite.NewEntryRepository(db, cfg.SQLite.QueryTimeout)
 	targetRepo := sqlite.NewTargetRepository(db, cfg.SQLite.QueryTimeout)
 
