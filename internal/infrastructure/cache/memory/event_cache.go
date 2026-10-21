@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sync"
+	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -15,6 +16,7 @@ type EventRepository interface {
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	Delete(ctx context.Context, eventID int64) error
+	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
 }
 
 type EventCache struct {
@@ -86,4 +88,13 @@ func (c *EventCache) Delete(ctx context.Context, eventID int64) error {
 	delete(c.events, eventID)
 
 	return c.inner.Delete(ctx, eventID)
+}
+
+func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	clear(c.events)
+
+	return c.inner.DeleteClosedBefore(ctx, before)
 }

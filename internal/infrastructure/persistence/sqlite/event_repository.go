@@ -215,14 +215,99 @@ func (r *EventRepository) Delete(ctx context.Context, eventID int64) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	const query = `
-		DELETE FROM events
-		WHERE id = ?
-	`
+	const (
+		deleteEntriesQuery = `
+			DELETE FROM queue_entries
+			WHERE event_id = ?
+		`
 
-	if _, err := r.db.ExecContext(ctx, query, eventID); err != nil {
+		deleteEventQuery = `
+			DELETE FROM events
+			WHERE id = ?			
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if _, err := tx.ExecContext(ctx, deleteEntriesQuery, eventID); err != nil {
+		return fmt.Errorf("delete entries: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, deleteEventQuery, eventID); err != nil {
 		return fmt.Errorf("delete event: %w", err)
 	}
 
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
 	return nil
+}
+
+func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Time) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		deleteEntriesQuery = `
+			DELETE FROM queue_entries
+			WHERE event_id IN (SELECT id FROM events WHERE status = 'closed' AND closed_at < ?)
+		`
+
+		deleteEventsQuery = `
+			DELETE FROM events
+			WHERE status = 'closed' AND closed_at < ?
+			RETURNING id
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if _, err := tx.ExecContext(ctx, deleteEntriesQuery, before.Unix()); err != nil {
+		return 0, fmt.Errorf("delete entries: %w", err)
+	}
+
+	deleted, err := countDeleted(ctx, tx, deleteEventsQuery, before.Unix())
+	if err != nil {
+		return 0, fmt.Errorf("delete events: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return deleted, nil
+}
+
+func countDeleted(ctx context.Context, tx *sql.Tx, query string, args ...any) (int, error) {
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	count := 0
+
+	for rows.Next() {
+		count++
+	}
+
+	return count, rows.Err()
 }

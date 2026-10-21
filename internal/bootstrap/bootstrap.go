@@ -21,6 +21,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/client/telegram"
 	logger "github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logger/slog"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/persistence/sqlite"
+	"github.com/danzori-dev/queue-manager/internal/worker/cleaner"
 	"github.com/danzori-dev/queue-manager/internal/worker/renderer"
 )
 
@@ -213,6 +214,13 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	_ = notifier.Send(ctx, texts.BotStarted(version()))
 
+	cleanupWorker := cleaner.New(
+		cleaner.Config{
+			Retention: cfg.Cleanup.Retention,
+			Interval:  cfg.Cleanup.Interval,
+		}, log,
+	)
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(
@@ -224,6 +232,12 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 	g.Go(
 		func() error {
 			return srv.Run(ctx)
+		},
+	)
+
+	g.Go(
+		func() error {
+			return cleanupWorker.Run(ctx, queueSvc)
 		},
 	)
 
