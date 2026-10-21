@@ -15,6 +15,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/application/student"
 	"github.com/danzori-dev/queue-manager/internal/config"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/middleware"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/cache/memory"
@@ -205,8 +206,12 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 				Handler:      tgHandler,
 				RoleResolver: adminSvc,
 				Students:     studentSvc,
-				APITimeout:   cfg.Telegram.APITimeout,
-				Log:          log,
+				RateLimit: middleware.RateLimitConfig{
+					Burst:    cfg.RateLimit.Burst,
+					Interval: cfg.RateLimit.Interval,
+				},
+				APITimeout: cfg.Telegram.APITimeout,
+				Log:        log,
 			},
 		),
 		log,

@@ -31,3 +31,7 @@ log:
 cleanup:
     retention: "${CLEANUP_RETENTION:-720h}"
     interval: "${CLEANUP_INTERVAL:-24h}"
+
+rate_limit:
+    burst: "${RATE_LIMIT_BURST:-5}"
+    interval: "${RATE_LIMIT_INTERVAL:-3s}"

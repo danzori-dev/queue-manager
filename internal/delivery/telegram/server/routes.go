@@ -18,6 +18,7 @@ type RouteParams struct {
 	Handler      *handler.Handler
 	RoleResolver middleware.RoleResolver
 	Students     middleware.StudentLookup
+	RateLimit    middleware.RateLimitConfig
 	APITimeout   time.Duration
 	Log          *slog.Logger
 }
@@ -29,6 +30,7 @@ func RegisterRoutes(p RouteParams) Register {
 			middleware.Recover(p.Bot, p.APITimeout, p.Log),
 			middleware.Roles(p.RoleResolver),
 			middleware.WhiteList(p.Students),
+			middleware.RateLimit(p.RateLimit, p.Bot, p.APITimeout, p.Log),
 		)
 
 		bh.HandleMessage(p.Handler.HandleHelp, th.CommandEqual("help"))
