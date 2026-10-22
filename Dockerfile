@@ -4,9 +4,11 @@ ARG GOOSE_VERSION=v3.29.0
 
 FROM golang:${GO_VERSION}-alpine AS build
 
-ARG VERSION=dev
+ARG VERSION
 
-WORKDIR /app
+RUN apk add --no-cache git
+
+WORKDIR /src
 
 COPY go.mod go.sum ./
 
@@ -14,7 +16,8 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -trimpath  \
+RUN VERSION="${VERSION:-$(git describe --tags --always)}" \
+    && CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -ldflags="-s -w -X github.com/danzori-dev/queue-manager/internal/bootstrap.buildVersion=${VERSION}" \
     -o /out/queuemanager ./cmd/queuemanager
 
@@ -42,13 +45,13 @@ FROM alpine:${ALPINE_VERSION} AS runtime
 RUN apk add --no-cache ca-certificates \
     && addgroup -S appgroup && adduser -S appuser -G appgroup
 
-WORKDIR /app
+WORKDIR /src
 
-COPY --from=build --chown=appuser:appgroup /out/queuemanager /app/queuemanager
-COPY --chown=appuser:appgroup configs/config.yml /app/configs/config.yml
+COPY --from=build --chown=appuser:appgroup /out/queuemanager /usr/local/bin/queuemanager
+COPY --chown=appuser:appgroup configs/config.yml /src/configs/config.yml
 
 USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/queuemanager"]
+ENTRYPOINT ["/usr/local/bin/queuemanager"]
