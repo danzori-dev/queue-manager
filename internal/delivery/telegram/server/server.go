@@ -77,6 +77,10 @@ func (s *Server) runOnce(parent context.Context) error {
 		return fmt.Errorf("start long polling: %w", err)
 	}
 
+	return s.serve(parent, updates)
+}
+
+func (s *Server) serve(ctx context.Context, updates <-chan telego.Update) error {
 	bh, err := th.NewBotHandler(s.bot, updates)
 	if err != nil {
 		return fmt.Errorf("create bot handler: %w", err)
@@ -92,12 +96,16 @@ func (s *Server) runOnce(parent context.Context) error {
 
 	s.log.InfoContext(ctx, "telegram server started")
 
-	select {
-	case err := <-startErr:
+	stop := func() error {
 		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.cfg.StopTimeout)
 		defer cancel()
 
-		_ = bh.StopWithContext(stopCtx)
+		return bh.StopWithContext(stopCtx)
+	}
+
+	select {
+	case err := <-startErr:
+		_ = stop()
 
 		if err == nil {
 			err = errors.New("updates channel closed")
@@ -105,11 +113,8 @@ func (s *Server) runOnce(parent context.Context) error {
 
 		return fmt.Errorf("bot handler stopped: %w", err)
 
-	case <-parent.Done():
-		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.cfg.StopTimeout)
-		defer cancel()
-
-		if err := bh.StopWithContext(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+	case <-ctx.Done():
+		if err := stop(); err != nil && !errors.Is(err, context.Canceled) {
 			s.log.WarnContext(
 				ctx, "stop bot handler",
 				slog.Any("err", err),
