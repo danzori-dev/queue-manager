@@ -11,12 +11,21 @@ import (
 	th "github.com/mymmrac/telego/telegohandler"
 )
 
+type Mode string
+
+const (
+	ModePolling Mode = "polling"
+	ModeWebhook Mode = "webhook"
+)
+
 type Config struct {
+	Mode           Mode
 	APITimeout     time.Duration
 	PollTimeout    int
 	RetryTimeout   time.Duration
 	StopTimeout    time.Duration
 	ReconnectDelay time.Duration
+	Webhook        WebhookConfig
 }
 
 type Register func(bh *th.BotHandler)
@@ -38,65 +47,22 @@ func New(bot *telego.Bot, cfg Config, register Register, log *slog.Logger) *Serv
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	for {
-		err := s.runOnce(ctx)
-		if ctx.Err() != nil {
-			return nil //nolint:nilerr // canceled ctx is a graceful shutdown, not a failure
-		}
+	var err error
 
-		s.log.ErrorContext(
-			ctx, "polling loop stopped unexpectedly, reconnecting",
-			slog.Duration("delay", s.cfg.ReconnectDelay),
-			slog.Any("err", err),
-		)
-
-		timer := time.NewTimer(s.cfg.ReconnectDelay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-
-			return nil
-
-		case <-timer.C:
-		}
+	if s.cfg.Mode != ModeWebhook {
+		err = s.runPolling(ctx)
+	} else {
+		err = s.runWebhook(ctx)
 	}
+
+	if ctx.Err() != nil {
+		return nil //nolint:nilerr // canceled ctx is a graceful shutdown, not a failure
+	}
+
+	return err
 }
 
-func (s *Server) runOnce(parent context.Context) error {
-	if err := s.deleteWebhook(parent); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(parent)
-	defer cancel()
-
-	updates, err := s.bot.UpdatesViaLongPolling(
-		ctx,
-		&telego.GetUpdatesParams{
-			Timeout:        s.cfg.PollTimeout,
-			AllowedUpdates: []string{"message", "callback_query", "my_chat_member"},
-		},
-		telego.WithLongPollingRetryTimeout(s.cfg.RetryTimeout),
-	)
-	if err != nil {
-		return fmt.Errorf("start long polling: %w", err)
-	}
-
-	return s.serve(parent, updates)
-}
-
-func (s *Server) deleteWebhook(ctx context.Context) error {
-	reqCtx, cancel := context.WithTimeout(ctx, s.cfg.APITimeout)
-	defer cancel()
-
-	if err := s.bot.DeleteWebhook(reqCtx, &telego.DeleteWebhookParams{DropPendingUpdates: false}); err != nil {
-		return fmt.Errorf("delete webhook: %w", err)
-	}
-
-	return nil
-}
-
-func (s *Server) serve(ctx context.Context, updates <-chan telego.Update) error {
+func (s *Server) serve(ctx context.Context, updates <-chan telego.Update, beforeStop func(stopCtx context.Context)) error {
 	bh, err := th.NewBotHandler(s.bot, updates)
 	if err != nil {
 		return fmt.Errorf("create bot handler: %w", err)
@@ -115,6 +81,10 @@ func (s *Server) serve(ctx context.Context, updates <-chan telego.Update) error 
 	stop := func() error {
 		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.cfg.StopTimeout)
 		defer cancel()
+
+		if beforeStop != nil {
+			beforeStop(stopCtx)
+		}
 
 		return bh.StopWithContext(stopCtx)
 	}
@@ -141,4 +111,8 @@ func (s *Server) serve(ctx context.Context, updates <-chan telego.Update) error 
 
 		return nil
 	}
+}
+
+func allowedUpdates() []string {
+	return []string{"message", "callback_query", "my_chat_member"}
 }
