@@ -2,6 +2,7 @@ telegram:
     token: "${TELEGRAM_BOT_TOKEN}"
     owner_id: "${TELEGRAM_BOT_OWNER_ID}"
     api_timeout: "${TELEGRAM_API_TIMEOUT:-10s}"
+    mode: "${TELEGRAM_MODE:-polling}"
     retry:
         max_attempts: "${TELEGRAM_RETRY_MAX_ATTEMPTS:-3}"
         exponent_base: "${TELEGRAM_RETRY_EXPONENT_BASE:-2.0}"
@@ -12,6 +13,10 @@ telegram:
         retry_timeout: "${TELEGRAM_POLL_RETRY_TIMEOUT:-5s}"
         stop_timeout: "${TELEGRAM_POLL_STOP_TIMEOUT:-10s}"
         reconnect_delay: "${TELEGRAM_POLL_RECONNECT_DELAY:-10s}"
+    webhook:
+        url: "${TELEGRAM_WEBHOOK_URL:-}"
+        path: "${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}"
+        listen: "${TELEGRAM_WEBHOOK_LISTEN:-:8080}"
 
 sqlite:
     dsn: "${SQLITE_DSN}"

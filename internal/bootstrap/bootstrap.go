@@ -194,10 +194,17 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 	srv := server.New(
 		bot,
 		server.Config{
+			Mode:           server.Mode(cfg.Telegram.Mode),
+			APITimeout:     cfg.Telegram.APITimeout,
 			PollTimeout:    int(cfg.Telegram.Poll.Timeout.Seconds()),
 			RetryTimeout:   cfg.Telegram.Poll.RetryTimeout,
 			StopTimeout:    cfg.Telegram.Poll.StopTimeout,
 			ReconnectDelay: cfg.Telegram.Poll.ReconnectDelay,
+			Webhook: server.WebhookConfig{
+				URL:    cfg.Telegram.Webhook.URL,
+				Path:   cfg.Telegram.Webhook.Path,
+				Listen: cfg.Telegram.Webhook.Listen,
+			},
 		},
 		//nolint:contextcheck // ctx comes from each update
 		server.RegisterRoutes(

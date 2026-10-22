@@ -15,11 +15,13 @@ type Config struct {
 }
 
 type Telegram struct {
-	Token      string        `validate:"required"      yaml:"token"`
-	OwnerID    int64         `validate:"required,gt=0" yaml:"owner_id"`
-	APITimeout time.Duration `validate:"required,gt=0" yaml:"api_timeout"`
-	Retry      TelegramRetry `yaml:"retry"`
-	Poll       TelegramPoll  `yaml:"poll"`
+	Token      string          `validate:"required"                       yaml:"token"`
+	OwnerID    int64           `validate:"required,gt=0"                  yaml:"owner_id"`
+	APITimeout time.Duration   `validate:"required,gt=0"                  yaml:"api_timeout"`
+	Mode       string          `validate:"required,oneof=polling webhook" yaml:"mode"`
+	Retry      TelegramRetry   `yaml:"retry"`
+	Poll       TelegramPoll    `yaml:"poll"`
+	Webhook    TelegramWebhook `yaml:"webhook"`
 }
 
 type TelegramRetry struct {
@@ -34,6 +36,12 @@ type TelegramPoll struct {
 	RetryTimeout   time.Duration `validate:"required,gt=0" yaml:"retry_timeout"`
 	StopTimeout    time.Duration `validate:"required,gt=0" yaml:"stop_timeout"`
 	ReconnectDelay time.Duration `validate:"required,gt=0" yaml:"reconnect_delay"`
+}
+
+type TelegramWebhook struct {
+	URL    string `validate:"omitempty,https_url"    yaml:"url"`
+	Path   string `validate:"required,startswith=/"  yaml:"path"`
+	Listen string `validate:"required,hostname_port" yaml:"listen"`
 }
 
 type SQLite struct {

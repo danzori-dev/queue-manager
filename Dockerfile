@@ -49,4 +49,6 @@ COPY --chown=appuser:appgroup configs/config.yml /app/configs/config.yml
 
 USER appuser
 
+EXPOSE 8080
+
 ENTRYPOINT ["/app/queuemanager"]
