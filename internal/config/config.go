@@ -39,10 +39,9 @@ type TelegramPoll struct {
 }
 
 type TelegramWebhook struct {
-	URL    string `validate:"omitempty,https_url"            yaml:"url"`
-	Path   string `validate:"required,startswith=/"          yaml:"path"`
-	Listen string `validate:"required,hostname_port"         yaml:"listen"`
-	Secret string `validate:"omitempty,base64rawurl,max=256" yaml:"secret"`
+	URL    string `validate:"omitempty,https_url"    yaml:"url"`
+	Path   string `validate:"required,startswith=/"  yaml:"path"`
+	Listen string `validate:"required,hostname_port" yaml:"listen"`
 }
 
 type SQLite struct {

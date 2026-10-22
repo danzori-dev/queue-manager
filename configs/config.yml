@@ -17,7 +17,6 @@ telegram:
         url: "${TELEGRAM_WEBHOOK_URL:-}"
         path: "${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}"
         listen: "${TELEGRAM_WEBHOOK_LISTEN:-:8080}"
-        secret: "${TELEGRAM_WEBHOOK_SECRET:-}"
 
 sqlite:
     dsn: "${SQLITE_DSN}"

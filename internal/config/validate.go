@@ -31,8 +31,4 @@ func validateTelegram(sl validator.StructLevel) {
 	if tg.Webhook.URL == "" {
 		sl.ReportError(tg.Webhook.URL, "webhook.url", "Webhook.URL", "required_if", "mode webhook")
 	}
-
-	if tg.Webhook.Secret == "" {
-		sl.ReportError(tg.Webhook.Secret, "webhook.secret", "Webhook.Secret", "required_if", "mode webhook")
-	}
 }
