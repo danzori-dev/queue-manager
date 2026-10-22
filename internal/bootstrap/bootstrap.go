@@ -55,7 +55,7 @@ func Run(ctx context.Context) error {
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
 			Version: version(),
-			Secrets: []string{cfg.Telegram.Token, cfg.SQLite.AuthToken},
+			Secrets: []string{cfg.Telegram.Token, cfg.Telegram.Webhook.Secret, cfg.SQLite.AuthToken},
 			Alerts:  notifier,
 		},
 	)
