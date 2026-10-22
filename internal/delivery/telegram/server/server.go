@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	APITimeout     time.Duration
 	PollTimeout    int
 	RetryTimeout   time.Duration
 	StopTimeout    time.Duration
@@ -62,6 +63,10 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) runOnce(parent context.Context) error {
+	if err := s.deleteWebhook(parent); err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 
@@ -78,6 +83,17 @@ func (s *Server) runOnce(parent context.Context) error {
 	}
 
 	return s.serve(parent, updates)
+}
+
+func (s *Server) deleteWebhook(ctx context.Context) error {
+	reqCtx, cancel := context.WithTimeout(ctx, s.cfg.APITimeout)
+	defer cancel()
+
+	if err := s.bot.DeleteWebhook(reqCtx, &telego.DeleteWebhookParams{DropPendingUpdates: false}); err != nil {
+		return fmt.Errorf("delete webhook: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Server) serve(ctx context.Context, updates <-chan telego.Update) error {

@@ -194,6 +194,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 	srv := server.New(
 		bot,
 		server.Config{
+			APITimeout:     cfg.Telegram.APITimeout,
 			PollTimeout:    int(cfg.Telegram.Poll.Timeout.Seconds()),
 			RetryTimeout:   cfg.Telegram.Poll.RetryTimeout,
 			StopTimeout:    cfg.Telegram.Poll.StopTimeout,
