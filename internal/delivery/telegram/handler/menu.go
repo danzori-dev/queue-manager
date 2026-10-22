@@ -89,7 +89,7 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	case domain.ActionDeleteConfirm:
 		err = h.queue.DeleteEvent(ctx, a.EventID)
 		if err == nil {
-			return texts.EventDeletedAnswer, h.editMenu(ctx, query, texts.EventDeleted, backKeyboard())
+			return texts.EventDeleted, h.editMenu(ctx, query, texts.EventDeleted, backKeyboard())
 		}
 
 	case domain.ActionCarry:
