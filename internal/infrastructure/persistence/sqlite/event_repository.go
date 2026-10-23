@@ -264,7 +264,6 @@ func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Ti
 		deleteEventsQuery = `
 			DELETE FROM events
 			WHERE status = 'closed' AND closed_at < ?
-			RETURNING id
 		`
 	)
 
@@ -281,33 +280,19 @@ func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Ti
 		return 0, fmt.Errorf("delete entries: %w", err)
 	}
 
-	deleted, err := countDeleted(ctx, tx, deleteEventsQuery, before.Unix())
+	res, err := tx.ExecContext(ctx, deleteEventsQuery, before.Unix())
 	if err != nil {
 		return 0, fmt.Errorf("delete events: %w", err)
+	}
+
+	deleted, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("count deleted events: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("commit tx: %w", err)
 	}
 
-	return deleted, nil
-}
-
-func countDeleted(ctx context.Context, tx *sql.Tx, query string, args ...any) (int, error) {
-	rows, err := tx.QueryContext(ctx, query, args...)
-	if err != nil {
-		return 0, err
-	}
-
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	count := 0
-
-	for rows.Next() {
-		count++
-	}
-
-	return count, rows.Err()
+	return int(deleted), nil
 }
