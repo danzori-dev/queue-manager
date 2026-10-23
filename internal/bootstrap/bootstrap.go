@@ -51,7 +51,7 @@ func Run(ctx context.Context) error {
 	}
 
 	log := logger.New(
-		logger.Options{
+		ctx, logger.Options{
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
 			Version: version(),
