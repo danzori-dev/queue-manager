@@ -51,7 +51,7 @@ func Run(ctx context.Context) error {
 	}
 
 	log := logger.New(
-		logger.Options{
+		ctx, logger.Options{
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
 			Version: version(),
@@ -135,7 +135,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 	}
 
 	studentRepo := sqlite.NewStudentRepository(db, cfg.SQLite.QueryTimeout)
-	studentSvc := student.NewService(studentRepo, cfg.Telegram.OwnerID)
+	studentSvc := student.NewService(studentRepo)
 
 	if err := studentSvc.Load(ctx); err != nil {
 		return err

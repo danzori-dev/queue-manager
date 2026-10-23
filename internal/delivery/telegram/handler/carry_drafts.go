@@ -38,9 +38,13 @@ func (d *carryDrafts) Take(adminID, fromID int64) (carryDraft, bool) {
 	defer d.mu.Unlock()
 
 	draft, ok := d.drafts[adminID]
+	if !ok || draft.fromID != fromID {
+		return carryDraft{}, false
+	}
+
 	delete(d.drafts, adminID)
 
-	if !ok || draft.fromID != fromID || time.Since(draft.createdAt) > carryDraftTTL {
+	if time.Since(draft.createdAt) > carryDraftTTL {
 		return carryDraft{}, false
 	}
 

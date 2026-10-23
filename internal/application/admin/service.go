@@ -58,11 +58,7 @@ func (s *Service) RoleOf(userID int64) access.Role {
 	return access.RoleOutsider
 }
 
-func (s *Service) Add(ctx context.Context, actorID, targetID int64) error {
-	if actorID != s.ownerID {
-		return access.ErrForbidden
-	}
-
+func (s *Service) Add(ctx context.Context, targetID int64) error {
 	if targetID == s.ownerID {
 		return access.ErrCannotAddSelf
 	}
@@ -82,11 +78,7 @@ func (s *Service) Add(ctx context.Context, actorID, targetID int64) error {
 	return nil
 }
 
-func (s *Service) Remove(ctx context.Context, actorID, targetID int64) error {
-	if actorID != s.ownerID {
-		return access.ErrForbidden
-	}
-
+func (s *Service) Remove(ctx context.Context, targetID int64) error {
 	if targetID == s.ownerID {
 		return access.ErrCannotRemoveOwner
 	}
@@ -106,11 +98,7 @@ func (s *Service) Remove(ctx context.Context, actorID, targetID int64) error {
 	return nil
 }
 
-func (s *Service) List(ctx context.Context, actorID int64) ([]int64, error) {
-	if actorID != s.ownerID {
-		return nil, access.ErrForbidden
-	}
-
+func (s *Service) List(ctx context.Context) ([]int64, error) {
 	ids, err := s.repo.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list admins: %w", err)

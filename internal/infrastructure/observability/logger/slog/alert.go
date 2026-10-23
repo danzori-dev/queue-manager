@@ -4,6 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+)
+
+const (
+	alertQueueSize = 32
+	stackKey       = "stack"
 )
 
 type AlertSender interface {
@@ -11,8 +17,26 @@ type AlertSender interface {
 }
 
 type alertHandler struct {
-	next   slog.Handler
-	sender AlertSender
+	next    slog.Handler
+	alerts  chan<- string
+	secrets *strings.Replacer
+}
+
+func newAlertHandler(ctx context.Context, next slog.Handler, sender AlertSender, secrets *strings.Replacer) *alertHandler {
+	alerts := make(chan string, alertQueueSize)
+	ctx = context.WithoutCancel(ctx)
+
+	go func() {
+		for text := range alerts {
+			_ = sender.Send(ctx, text)
+		}
+	}()
+
+	return &alertHandler{
+		next:    next,
+		alerts:  alerts,
+		secrets: secrets,
+	}
 }
 
 func (h *alertHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -23,7 +47,7 @@ func (h *alertHandler) Handle(ctx context.Context, rec slog.Record) error {
 	err := h.next.Handle(ctx, rec)
 
 	if rec.Level >= slog.LevelWarn {
-		h.alert(ctx, rec)
+		h.alert(rec)
 	}
 
 	return err
@@ -31,24 +55,47 @@ func (h *alertHandler) Handle(ctx context.Context, rec slog.Record) error {
 
 func (h *alertHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &alertHandler{
-		next:   h.next.WithAttrs(attrs),
-		sender: h.sender,
+		next:    h.next.WithAttrs(attrs),
+		alerts:  h.alerts,
+		secrets: h.secrets,
 	}
 }
 
 func (h *alertHandler) WithGroup(name string) slog.Handler {
 	return &alertHandler{
-		next:   h.next.WithGroup(name),
-		sender: h.sender,
+		next:    h.next.WithGroup(name),
+		alerts:  h.alerts,
+		secrets: h.secrets,
 	}
 }
 
-func (h *alertHandler) alert(ctx context.Context, rec slog.Record) {
+func (h *alertHandler) alert(rec slog.Record) {
+	select {
+	case h.alerts <- h.format(rec):
+	default:
+	}
+}
+
+func (h *alertHandler) format(rec slog.Record) string {
 	icon := "🟡"
 
 	if rec.Level >= slog.LevelError {
 		icon = "🔴"
 	}
 
-	_ = h.sender.Send(context.WithoutCancel(ctx), fmt.Sprintf("%s %s: %s", icon, rec.Level, rec.Message))
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s %s: %s", icon, rec.Level, rec.Message)
+
+	rec.Attrs(
+		func(a slog.Attr) bool {
+			if a.Key != stackKey {
+				fmt.Fprintf(&b, "\n%s: %s", a.Key, a.Value)
+			}
+
+			return true
+		},
+	)
+
+	return h.secrets.Replace(b.String())
 }

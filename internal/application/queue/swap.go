@@ -11,45 +11,17 @@ import (
 )
 
 func (s *Service) SwapTargets(ctx context.Context, userID int64) ([]domain.Event, error) {
-	ids, err := s.events.ListOpenIDs(ctx)
+	events, err := s.events.ListOpenWithUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list open events: %w", err)
-	}
-
-	var events []domain.Event
-
-	for _, id := range ids {
-		position, err := s.entries.Position(ctx, id, userID)
-		if err != nil {
-			return nil, fmt.Errorf("get position: %w", err)
-		}
-
-		if position == 0 {
-			continue
-		}
-
-		event, err := s.events.Get(ctx, id)
-		if errors.Is(err, domain.ErrEventNotFound) {
-			continue
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		events = append(events, event)
+		return nil, fmt.Errorf("list open events with user: %w", err)
 	}
 
 	return events, nil
 }
 
 func (s *Service) SwapCandidates(ctx context.Context, eventID, userID int64) (View, error) {
-	event, err := s.events.Get(ctx, eventID)
+	event, err := s.loadOpenEvent(ctx, eventID)
 	if err != nil {
-		return View{}, err
-	}
-
-	if err := event.CanJoin(); err != nil {
 		return View{}, err
 	}
 
@@ -75,12 +47,8 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		return domain.SwapRequest{}, domain.ErrSwapSelf
 	}
 
-	event, err := s.events.Get(ctx, eventID)
+	event, err := s.loadOpenEvent(ctx, eventID)
 	if err != nil {
-		return domain.SwapRequest{}, err
-	}
-
-	if err := event.CanJoin(); err != nil {
 		return domain.SwapRequest{}, err
 	}
 
@@ -114,10 +82,6 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 	if err != nil {
 		s.swaps.remove(req.ID)
 
-		if errors.Is(err, domain.ErrSwapUnreachable) {
-			return domain.SwapRequest{}, err
-		}
-
 		return domain.SwapRequest{}, fmt.Errorf("ask swap: %w", err)
 	}
 
@@ -133,12 +97,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (doma
 		return req, err
 	}
 
-	event, err := s.events.Get(ctx, req.Event.ID)
-	if err != nil {
-		return req, err
-	}
-
-	if err := event.CanJoin(); err != nil {
+	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
 		return req, err
 	}
 

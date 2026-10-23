@@ -13,23 +13,10 @@ func (s *Service) PlanCarry(ctx context.Context, fromID int64, fromPos int, toID
 		return CarryPlan{}, err
 	}
 
-	lines := make([]Line, 0, len(c.entries))
-
-	for i, e := range c.entries {
-		lines = append(
-			lines, Line{
-				Position: fromPos + i,
-				UserID:   e.UserID,
-				Name:     s.studentName(e.UserID),
-				UserName: e.Username,
-			},
-		)
-	}
-
 	return CarryPlan{
 		From:  c.from,
 		To:    c.to,
-		Lines: lines,
+		Lines: s.lines(c.entries, fromPos),
 	}, nil
 }
 

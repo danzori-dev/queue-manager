@@ -126,7 +126,3 @@ func carryKeyboard(fromID int64) *telego.InlineKeyboardMarkup {
 		),
 	)
 }
-
-func noButtons() *telego.InlineKeyboardMarkup {
-	return &telego.InlineKeyboardMarkup{InlineKeyboard: [][]telego.InlineKeyboardButton{}}
-}

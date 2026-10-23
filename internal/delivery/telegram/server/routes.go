@@ -29,7 +29,7 @@ func RegisterRoutes(p RouteParams) Register {
 			middleware.Logging(p.Log),
 			middleware.Recover(p.Bot, p.APITimeout, p.Log),
 			middleware.Roles(p.RoleResolver),
-			middleware.WhiteList(p.Students),
+			middleware.WhiteList(p.Students, p.Bot, p.APITimeout),
 			middleware.RateLimit(p.RateLimit, p.Bot, p.APITimeout, p.Log),
 		)
 

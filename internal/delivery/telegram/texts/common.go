@@ -7,6 +7,7 @@ const (
 	AccessDenied      = "Нет доступа."
 	TooManyRequests   = "Не так быстро, попробуй чуть позже."
 	StudentsNotLoaded = "Сначала загрузи список студентов: <code>/import_students</code>."
+	NotWhitelisted    = "У тебя нет доступа к боту, обратись к администратору."
 
 	ButtonCancel   = "Отмена"
 	ButtonPrevPage = "←"

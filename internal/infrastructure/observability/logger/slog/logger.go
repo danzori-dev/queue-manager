@@ -1,6 +1,7 @@
 package slog
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"strings"
@@ -21,10 +22,12 @@ type Options struct {
 	Alerts  AlertSender
 }
 
-func New(opts Options) *slog.Logger {
+func New(ctx context.Context, opts Options) *slog.Logger {
+	secrets := secretsReplacer(opts.Secrets)
+
 	handlerOpts := &slog.HandlerOptions{
 		Level:       opts.Level,
-		ReplaceAttr: redact(opts.Secrets),
+		ReplaceAttr: redact(secrets),
 	}
 
 	var handler slog.Handler
@@ -36,29 +39,25 @@ func New(opts Options) *slog.Logger {
 	}
 
 	if opts.Alerts != nil {
-		handler = &alertHandler{
-			next:   handler,
-			sender: opts.Alerts,
-		}
+		handler = newAlertHandler(ctx, handler, opts.Alerts, secrets)
 	}
 
 	return slog.New(newContextHandler(handler)).With(slog.String("version", opts.Version))
 }
 
-func redact(secrets []string) func([]string, slog.Attr) slog.Attr {
+func secretsReplacer(secrets []string) *strings.Replacer {
 	pairs := make([]string, 0, len(secrets)*2)
+
 	for _, s := range secrets {
 		if s != "" {
 			pairs = append(pairs, s, "***")
 		}
 	}
 
-	if len(pairs) == 0 {
-		return nil
-	}
+	return strings.NewReplacer(pairs...)
+}
 
-	r := strings.NewReplacer(pairs...)
-
+func redact(r *strings.Replacer) func([]string, slog.Attr) slog.Attr {
 	return func(_ []string, a slog.Attr) slog.Attr {
 		switch a.Value.Kind() {
 		case slog.KindString:

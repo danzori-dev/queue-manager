@@ -9,22 +9,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/danzori-dev/queue-manager/internal/domain/access"
 	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 type Service struct {
-	repo    StudentRepository
-	ownerID int64
+	repo StudentRepository
 
 	mu       sync.RWMutex
 	students map[int64]string
 }
 
-func NewService(repo StudentRepository, ownerID int64) *Service {
+func NewService(repo StudentRepository) *Service {
 	return &Service{
 		repo:     repo,
-		ownerID:  ownerID,
 		students: make(map[int64]string),
 	}
 }
@@ -42,11 +39,7 @@ func (s *Service) Load(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) Import(ctx context.Context, actorID int64, list map[int64]string) error {
-	if actorID != s.ownerID {
-		return access.ErrForbidden
-	}
-
+func (s *Service) Import(ctx context.Context, list map[int64]string) error {
 	if err := student.Validate(list); err != nil {
 		return err
 	}

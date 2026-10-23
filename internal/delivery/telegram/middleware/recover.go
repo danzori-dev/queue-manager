@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"runtime/debug"
 	"time"
@@ -15,7 +14,7 @@ import (
 )
 
 func Recover(bot *telego.Bot, apiTimeout time.Duration, log *slog.Logger) th.Handler {
-	return func(ctx *th.Context, update telego.Update) (err error) {
+	return func(ctx *th.Context, update telego.Update) error {
 		defer func() {
 			if r := recover(); r != nil {
 				log.ErrorContext(
@@ -33,8 +32,6 @@ func Recover(bot *telego.Bot, apiTimeout time.Duration, log *slog.Logger) th.Han
 						tu.CallbackQuery(update.CallbackQuery.ID).WithText(texts.InternalError),
 					)
 				}
-
-				err = fmt.Errorf("panic recovered: %v", r)
 			}
 		}()
 
