@@ -203,6 +203,7 @@ func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, e
 
 	p := paginate(len(view.Lines), page)
 
+	return h.editMenu(ctx, query, texts.EventMembers(view, p.index, p.count), membersKeyboard(view, p, query.From.ID))
 }
 
 func eventsKeyboard(events []domain.Event) *telego.InlineKeyboardMarkup {
@@ -296,14 +297,20 @@ func deleteConfirmKeyboard(eventID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
+func membersKeyboard(view appqueue.View, p page, selfID int64) *telego.InlineKeyboardMarkup {
 	eventID := view.Event.ID
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, line := range view.Lines[p.start:p.end] {
+		label := fmt.Sprintf("❌ %d. %s", line.Position, line.Name)
+		if line.UserID == selfID {
+			label += " (ты)"
+		}
+
 		rows = append(
 			rows, tu.InlineKeyboardRow(
 				button(
-					fmt.Sprintf("❌ %d. %s", line.Position, line.Name), domain.Action{
+					label, domain.Action{
 						Kind:    domain.ActionKick,
 						EventID: eventID,
 						UserID:  line.UserID,
