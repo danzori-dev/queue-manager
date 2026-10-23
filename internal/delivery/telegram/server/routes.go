@@ -45,15 +45,15 @@ func RegisterRoutes(p RouteParams) Register {
 			p.Handler.HandleMenuCallback, th.AnyCallbackQueryWithMessage(),
 			actions(
 				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
-				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick,
+				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick, domain.ActionMembers,
 				domain.ActionCarry, domain.ActionCarryCancel,
 			),
 		)
 		bh.HandleCallbackQuery(
 			p.Handler.HandleSwapCallback, th.AnyCallbackQueryWithMessage(),
 			actions(
-				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapSend, domain.ActionSwapAbort,
-				domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
+				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapPage, domain.ActionSwapSend,
+				domain.ActionSwapAbort, domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
 			),
 		)
 

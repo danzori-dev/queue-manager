@@ -47,8 +47,8 @@ func (h *Handler) HandleSwapCallback(ctx *th.Context, query telego.CallbackQuery
 
 func (h *Handler) applySwapAction(ctx context.Context, query telego.CallbackQuery, a domain.Action) (string, error) {
 	switch a.Kind {
-	case domain.ActionSwapEvent:
-		return "", h.showSwapCandidates(ctx, query, a.EventID)
+	case domain.ActionSwapEvent, domain.ActionSwapPage:
+		return "", h.showSwapCandidates(ctx, query, a.EventID, a.Page)
 
 	case domain.ActionSwapPick:
 		return "", h.showSwapConfirm(ctx, query, a.EventID, a.UserID)
@@ -67,7 +67,7 @@ func (h *Handler) applySwapAction(ctx context.Context, query telego.CallbackQuer
 	}
 }
 
-func (h *Handler) showSwapCandidates(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
+func (h *Handler) showSwapCandidates(ctx context.Context, query telego.CallbackQuery, eventID int64, page int) error {
 	view, err := h.swaps.SwapCandidates(ctx, eventID, query.From.ID)
 	if err != nil {
 		return h.swapStepFailed(ctx, query, err)
@@ -77,7 +77,9 @@ func (h *Handler) showSwapCandidates(ctx context.Context, query telego.CallbackQ
 		return h.editMenu(ctx, query, texts.SwapNobody, noButtons())
 	}
 
-	return h.editMenu(ctx, query, texts.SwapChoosePerson(view.Event.ID, view.Event.Title), swapPeopleKeyboard(view, query.From.ID))
+	text, kb := swapPeople(view, query.From.ID, page)
+
+	return h.editMenu(ctx, query, text, kb)
 }
 
 func (h *Handler) startSwap(ctx context.Context, msg telego.Message, eventID int64) error {
@@ -95,7 +97,9 @@ func (h *Handler) startSwap(ctx context.Context, msg telego.Message, eventID int
 		return h.sendHTML(ctx, msg, texts.SwapNobody)
 	}
 
-	return h.sendMenu(ctx, msg, texts.SwapChoosePerson(view.Event.ID, view.Event.Title), swapPeopleKeyboard(view, msg.From.ID))
+	text, kb := swapPeople(view, msg.From.ID, 0)
+
+	return h.sendMenu(ctx, msg, text, kb)
 }
 
 func (h *Handler) showSwapConfirm(ctx context.Context, query telego.CallbackQuery, eventID, toID int64) error {
@@ -300,14 +304,17 @@ func swapEventsKeyboard(events []domain.Event) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(rows...)
 }
 
-func swapPeopleKeyboard(view appqueue.View, selfID int64) *telego.InlineKeyboardMarkup {
-	rows := make([][]telego.InlineKeyboardButton, 0, len(view.Lines))
+func swapPeople(view appqueue.View, selfID int64, requested int) (string, *telego.InlineKeyboardMarkup) {
+	others := slices.DeleteFunc(
+		slices.Clone(view.Lines), func(l appqueue.Line) bool {
+			return l.UserID == selfID
+		},
+	)
 
-	for _, line := range view.Lines {
-		if line.UserID == selfID {
-			continue
-		}
+	p := paginate(len(others), requested)
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+1)
 
+	for _, line := range others[p.start:p.end] {
 		rows = append(
 			rows, tu.InlineKeyboardRow(
 				button(
@@ -321,7 +328,17 @@ func swapPeopleKeyboard(view appqueue.View, selfID int64) *telego.InlineKeyboard
 		)
 	}
 
-	return tu.InlineKeyboard(rows...)
+	rows = appendPageRow(
+		rows, p, func(index int) domain.Action {
+			return domain.Action{
+				Kind:    domain.ActionSwapPage,
+				EventID: view.Event.ID,
+				Page:    index,
+			}
+		},
+	)
+
+	return texts.SwapChoosePerson(view.Event.ID, view.Event.Title, p.index, p.count), tu.InlineKeyboard(rows...)
 }
 
 func swapConfirmKeyboard(eventID, toID int64) *telego.InlineKeyboardMarkup {

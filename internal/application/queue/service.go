@@ -231,6 +231,10 @@ func (s *Service) RemoveParticipant(ctx context.Context, eventID, actorID, userI
 
 	s.scheduler.Schedule(eventID)
 
+	if actorID == userID {
+		return true, nil
+	}
+
 	actorName, _ := s.students.Name(actorID)
 
 	s.messages.AnnounceRemoval(
