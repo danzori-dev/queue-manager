@@ -45,7 +45,7 @@ func RegisterRoutes(p RouteParams) Register {
 			p.Handler.HandleMenuCallback, th.AnyCallbackQueryWithMessage(),
 			actions(
 				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
-				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick,
+				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick, domain.ActionMembers,
 				domain.ActionCarry, domain.ActionCarryCancel,
 			),
 		)

@@ -10,9 +10,10 @@ import (
 const confirmWindow = 5 * time.Second
 
 type pressKey struct {
-	kind    domain.ActionKind
-	eventID int64
-	userID  int64
+	kind     domain.ActionKind
+	eventID  int64
+	actorID  int64
+	targetID int64
 }
 
 type confirmations struct {
@@ -26,7 +27,7 @@ func newConfirmations() *confirmations {
 	}
 }
 
-func (c *confirmations) Confirm(kind domain.ActionKind, eventID, userID int64) bool {
+func (c *confirmations) Confirm(kind domain.ActionKind, eventID, actorID, targetID int64) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -39,9 +40,10 @@ func (c *confirmations) Confirm(kind domain.ActionKind, eventID, userID int64) b
 	}
 
 	key := pressKey{
-		kind:    kind,
-		eventID: eventID,
-		userID:  userID,
+		kind:     kind,
+		eventID:  eventID,
+		actorID:  actorID,
+		targetID: targetID,
 	}
 
 	if _, ok := c.pressed[key]; ok {

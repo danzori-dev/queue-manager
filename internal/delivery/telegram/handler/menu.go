@@ -66,6 +66,12 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	case domain.ActionMenu:
 		return "", h.showMenu(ctx, query, a.EventID)
 
+	case domain.ActionKick:
+		return h.kick(ctx, query, a)
+
+	case domain.ActionMembers:
+		return "", h.showMembers(ctx, query, a.EventID, a.Page)
+
 	case domain.ActionDelete:
 		return "", h.showDeleteConfirm(ctx, query, a.EventID)
 
@@ -74,17 +80,6 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 
 	case domain.ActionOpen:
 		text, err = texts.EventOpenedAnswer, h.queue.OpenEvent(ctx, a.EventID)
-
-	case domain.ActionKick:
-		var removed bool
-
-		removed, err = h.queue.RemoveParticipant(ctx, a.EventID, query.From.ID, a.UserID)
-
-		text = texts.ParticipantRemoved
-
-		if !removed {
-			text = texts.ParticipantNotFound
-		}
 
 	case domain.ActionDeleteConfirm:
 		err = h.queue.DeleteEvent(ctx, a.EventID)
@@ -139,6 +134,44 @@ func (h *Handler) showMenu(ctx context.Context, query telego.CallbackQuery, even
 	return h.editMenu(ctx, query, texts.EventMenu(view), menuKeyboard(view))
 }
 
+func (h *Handler) kick(ctx context.Context, query telego.CallbackQuery, a domain.Action) (string, error) {
+	if !h.confirms.Confirm(domain.ActionKick, a.EventID, query.From.ID, a.UserID) {
+		return texts.KickPressAgain, nil
+	}
+
+	removed, err := h.queue.RemoveParticipant(ctx, a.EventID, query.From.ID, a.UserID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	text := texts.ParticipantRemoved
+
+	if !removed {
+		text = texts.ParticipantNotFound
+	}
+
+	return text, h.showMembers(ctx, query, a.EventID, a.Page)
+}
+
+func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, eventID int64, page int) error {
+	view, err := h.queue.EventView(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return err
+	}
+
+	p := paginate(len(view.Lines), page)
+
+	return h.editMenu(ctx, query, texts.EventMembers(view, p.index, p.count), membersKeyboard(view, p))
+}
+
 func (h *Handler) showDeleteConfirm(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
 	view, err := h.queue.EventView(ctx, eventID)
 	if errors.Is(err, domain.ErrEventNotFound) {
@@ -177,27 +210,12 @@ func eventsKeyboard(events []domain.Event) *telego.InlineKeyboardMarkup {
 }
 
 func menuKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
-	id := view.Event.ID
-	rows := make([][]telego.InlineKeyboardButton, 0, len(view.Lines)+3)
-
-	for _, line := range view.Lines {
-		rows = append(
-			rows, tu.InlineKeyboardRow(
-				button(
-					fmt.Sprintf("❌ %d. %s", line.Position, line.Name), domain.Action{
-						Kind:    domain.ActionKick,
-						EventID: id,
-						UserID:  line.UserID,
-					},
-				),
-			),
-		)
-	}
+	eventID := view.Event.ID
 
 	toggle := button(
 		texts.ButtonClose, domain.Action{
 			Kind:    domain.ActionClose,
-			EventID: id,
+			EventID: eventID,
 		},
 	)
 
@@ -205,18 +223,25 @@ func menuKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 		toggle = button(
 			texts.ButtonOpen, domain.Action{
 				Kind:    domain.ActionOpen,
-				EventID: id,
+				EventID: eventID,
 			},
 		)
 	}
 
-	rows = append(
-		rows,
+	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			toggle, button(
 				texts.ButtonRefresh, domain.Action{
 					Kind:    domain.ActionMenu,
-					EventID: id,
+					EventID: eventID,
+				},
+			),
+		),
+		tu.InlineKeyboardRow(
+			button(
+				texts.ButtonMembers, domain.Action{
+					Kind:    domain.ActionMembers,
+					EventID: eventID,
 				},
 			),
 		),
@@ -224,11 +249,52 @@ func menuKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 			button(
 				texts.ButtonDelete, domain.Action{
 					Kind:    domain.ActionDelete,
-					EventID: id,
+					EventID: eventID,
 				},
 			),
 		),
 		tu.InlineKeyboardRow(button(texts.ButtonBack, domain.Action{Kind: domain.ActionList})),
+	)
+}
+
+func membersKeyboard(view appqueue.View, p page) *telego.InlineKeyboardMarkup {
+	eventID := view.Event.ID
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
+
+	for _, line := range view.Lines[p.start:p.end] {
+		rows = append(
+			rows, tu.InlineKeyboardRow(
+				button(
+					fmt.Sprintf("❌ %d. %s", line.Position, line.Name), domain.Action{
+						Kind:    domain.ActionKick,
+						EventID: eventID,
+						UserID:  line.UserID,
+						Page:    p.index,
+					},
+				),
+			),
+		)
+	}
+
+	rows = appendPageRow(
+		rows, p, func(index int) domain.Action {
+			return domain.Action{
+				Kind:    domain.ActionMembers,
+				EventID: eventID,
+				Page:    index,
+			}
+		},
+	)
+
+	rows = append(
+		rows, tu.InlineKeyboardRow(
+			button(
+				texts.ButtonBackToEvent, domain.Action{
+					Kind:    domain.ActionMenu,
+					EventID: eventID,
+				},
+			),
+		),
 	)
 
 	return tu.InlineKeyboard(rows...)

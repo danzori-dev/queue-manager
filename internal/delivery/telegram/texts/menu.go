@@ -17,17 +17,22 @@ const (
 	ButtonClose         = "Закрыть запись"
 	ButtonOpen          = "Открыть запись"
 	ButtonRefresh       = "Обновить"
+	ButtonMembers       = "Участники"
 	ButtonDelete        = "Удалить очередь"
 	ButtonConfirmDelete = "Да, удалить"
 	ButtonBack          = "← К списку"
+	ButtonBackToEvent   = "← К очереди"
 
 	EventClosedAnswer = "Запись закрыта."
 	EventOpenedAnswer = "Запись открыта."
 
+	KickPressAgain      = "Нажми ещё раз в течение 5 секунд, чтобы убрать студента."
 	ParticipantRemoved  = "Студент убран из очереди."
 	ParticipantNotFound = "Этого студента уже нет в очереди."
 
 	EventDeleted = "Очередь удалена."
+
+	queueEmpty = "В очереди никого нет."
 )
 
 func EventMenu(view appqueue.View) string {
@@ -42,7 +47,7 @@ func EventMenu(view appqueue.View) string {
 	}
 
 	if len(view.Lines) == 0 {
-		b.WriteString("\nВ очереди никого нет.")
+		b.WriteString("\n" + queueEmpty)
 
 		return b.String()
 	}
@@ -55,9 +60,17 @@ func EventMenu(view appqueue.View) string {
 		}
 	}
 
-	b.WriteString("\n\nНажми на студента, чтобы убрать его из очереди.")
-
 	return b.String()
+}
+
+func EventMembers(view appqueue.View, page, pages int) string {
+	header := fmt.Sprintf("<b>#%d %s</b>\n", view.Event.ID, html.EscapeString(view.Event.Title))
+
+	if len(view.Lines) == 0 {
+		return header + queueEmpty
+	}
+
+	return header + "Нажми на студента, чтобы убрать его из очереди." + pageLine(page, pages)
 }
 
 func DeleteConfirm(title string) string {

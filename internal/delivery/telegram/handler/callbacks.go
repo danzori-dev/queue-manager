@@ -69,7 +69,7 @@ func (h *Handler) leave(ctx context.Context, eventID, userID int64) (string, err
 }
 
 func (h *Handler) skip(ctx context.Context, eventID, userID int64) (string, error) {
-	if !h.confirms.Confirm(domain.ActionSkip, eventID, userID) {
+	if !h.confirms.Confirm(domain.ActionSkip, eventID, userID, userID) {
 		return texts.SkipPressAgain, nil
 	}
 

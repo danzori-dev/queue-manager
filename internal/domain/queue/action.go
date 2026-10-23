@@ -18,6 +18,7 @@ const (
 	ActionDelete        ActionKind = "delete"
 	ActionDeleteConfirm ActionKind = "delconfirm"
 	ActionKick          ActionKind = "kick"
+	ActionMembers       ActionKind = "members"
 	ActionSkip          ActionKind = "skip"
 	ActionCarry         ActionKind = "carry"
 	ActionCarryCancel   ActionKind = "carrycancel"
