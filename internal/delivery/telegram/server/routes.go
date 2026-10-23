@@ -52,8 +52,8 @@ func RegisterRoutes(p RouteParams) Register {
 		bh.HandleCallbackQuery(
 			p.Handler.HandleSwapCallback, th.AnyCallbackQueryWithMessage(),
 			actions(
-				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapSend, domain.ActionSwapAbort,
-				domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
+				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapPage, domain.ActionSwapSend,
+				domain.ActionSwapAbort, domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
 			),
 		)
 

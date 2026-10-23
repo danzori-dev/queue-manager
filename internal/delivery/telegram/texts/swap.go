@@ -27,8 +27,8 @@ const (
 	SwapCanceled = "Запрос отменён."
 )
 
-func SwapChoosePerson(eventID int64, title string) string {
-	return fmt.Sprintf("<b>#%d %s</b>\nС кем поменяться?", eventID, html.EscapeString(title))
+func SwapChoosePerson(eventID int64, title string, page, pages int) string {
+	return fmt.Sprintf("<b>#%d %s</b>\nС кем поменяться?", eventID, html.EscapeString(title)) + pageLine(page, pages)
 }
 
 func SwapConfirm(title string, myPos int, otherName string, otherPos int) string {
