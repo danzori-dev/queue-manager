@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -42,11 +41,7 @@ func (h *Handler) HandleImportStudents(ctx *th.Context, msg telego.Message) erro
 		return h.sendHTML(ctx, msg, texts.StudentsImportFailed(err))
 	}
 
-	if err := h.students.Import(ctx, msg.From.ID, list); err != nil {
-		if errors.Is(err, access.ErrForbidden) {
-			return h.sendHTML(ctx, msg, texts.AccessDenied)
-		}
-
+	if err := h.students.Import(ctx, list); err != nil {
 		return h.sendHTML(ctx, msg, texts.StudentsImportFailed(err))
 	}
 

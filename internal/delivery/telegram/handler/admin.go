@@ -32,7 +32,7 @@ func (h *Handler) HandleAddAdmin(ctx *th.Context, msg telego.Message) error {
 		return h.sendHTML(ctx, msg, texts.NotAStudent)
 	}
 
-	if err := h.admin.Add(ctx, msg.From.ID, targetID); err != nil {
+	if err := h.admin.Add(ctx, targetID); err != nil {
 		return h.replyAdminError(ctx, msg, err)
 	}
 
@@ -53,7 +53,7 @@ func (h *Handler) HandleRmAdmin(ctx *th.Context, msg telego.Message) error {
 		return h.sendHTML(ctx, msg, texts.RmAdminUsage)
 	}
 
-	if err := h.admin.Remove(ctx, msg.From.ID, targetID); err != nil {
+	if err := h.admin.Remove(ctx, targetID); err != nil {
 		return h.replyAdminError(ctx, msg, err)
 	}
 
@@ -69,9 +69,9 @@ func (h *Handler) HandleAdmins(ctx *th.Context, msg telego.Message) error {
 		return err
 	}
 
-	ids, err := h.admin.List(ctx, msg.From.ID)
+	ids, err := h.admin.List(ctx)
 	if err != nil {
-		return h.replyAdminError(ctx, msg, err)
+		return err
 	}
 
 	labels := make([]string, 0, len(ids))
@@ -84,9 +84,6 @@ func (h *Handler) HandleAdmins(ctx *th.Context, msg telego.Message) error {
 
 func (h *Handler) replyAdminError(ctx context.Context, msg telego.Message, err error) error {
 	switch {
-	case errors.Is(err, access.ErrForbidden):
-		return h.sendHTML(ctx, msg, texts.AccessDenied)
-
 	case errors.Is(err, access.ErrCannotAddSelf):
 		return h.sendHTML(ctx, msg, texts.CannotAddSelf)
 
