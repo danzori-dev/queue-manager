@@ -54,11 +54,6 @@ func (h *Handler) HandleMenuCallback(ctx *th.Context, query telego.CallbackQuery
 }
 
 func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuery, a domain.Action) (string, error) {
-	var (
-		text string
-		err  error
-	)
-
 	switch a.Kind {
 	case domain.ActionList:
 		return "", h.showEvents(ctx, query)
@@ -66,26 +61,23 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	case domain.ActionMenu:
 		return "", h.showMenu(ctx, query, a.EventID)
 
+	case domain.ActionClose:
+		return h.closeEvent(ctx, query, a.EventID)
+
+	case domain.ActionOpen:
+		return h.openEvent(ctx, query, a.EventID)
+
+	case domain.ActionDelete:
+		return "", h.showDeleteConfirm(ctx, query, a.EventID)
+
+	case domain.ActionDeleteConfirm:
+		return h.deleteEvent(ctx, query, a.EventID)
+
 	case domain.ActionKick:
 		return h.kick(ctx, query, a)
 
 	case domain.ActionMembers:
 		return "", h.showMembers(ctx, query, a.EventID, a.Page)
-
-	case domain.ActionDelete:
-		return "", h.showDeleteConfirm(ctx, query, a.EventID)
-
-	case domain.ActionClose:
-		text, err = texts.EventClosedAnswer, h.queue.CloseEvent(ctx, a.EventID)
-
-	case domain.ActionOpen:
-		text, err = texts.EventOpenedAnswer, h.queue.OpenEvent(ctx, a.EventID)
-
-	case domain.ActionDeleteConfirm:
-		err = h.queue.DeleteEvent(ctx, a.EventID)
-		if err == nil {
-			return texts.EventDeleted, h.editMenu(ctx, query, texts.EventDeleted, backKeyboard())
-		}
 
 	case domain.ActionCarry:
 		return h.confirmCarry(ctx, query, a.EventID)
@@ -96,16 +88,6 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	default:
 		return "", domain.ErrUnknownAction
 	}
-
-	if errors.Is(err, domain.ErrEventNotFound) {
-		return texts.QueueNotFound, h.editMenu(ctx, query, texts.EventGone, backKeyboard())
-	}
-
-	if err != nil {
-		return "", err
-	}
-
-	return text, h.showMenu(ctx, query, a.EventID)
 }
 
 func (h *Handler) showEvents(ctx context.Context, query telego.CallbackQuery) error {
@@ -132,6 +114,58 @@ func (h *Handler) showMenu(ctx context.Context, query telego.CallbackQuery, even
 	}
 
 	return h.editMenu(ctx, query, texts.EventMenu(view), menuKeyboard(view))
+}
+
+func (h *Handler) closeEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
+	err := h.queue.CloseEvent(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return texts.EventClosedAnswer, h.showMenu(ctx, query, eventID)
+}
+
+func (h *Handler) openEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
+	err := h.queue.OpenEvent(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return texts.EventOpenedAnswer, h.showMenu(ctx, query, eventID)
+}
+
+func (h *Handler) showDeleteConfirm(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
+	view, err := h.queue.EventView(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return h.editMenu(ctx, query, texts.DeleteConfirm(view.Event.Title), deleteConfirmKeyboard(eventID))
+}
+
+func (h *Handler) deleteEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
+	err := h.queue.DeleteEvent(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.editMenu(ctx, query, texts.EventGone, backKeyboard())
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return texts.EventDeleted, h.editMenu(ctx, query, texts.EventDeleted, backKeyboard())
 }
 
 func (h *Handler) kick(ctx context.Context, query telego.CallbackQuery, a domain.Action) (string, error) {
@@ -169,20 +203,6 @@ func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, e
 
 	p := paginate(len(view.Lines), page)
 
-	return h.editMenu(ctx, query, texts.EventMembers(view, p.index, p.count), membersKeyboard(view, p))
-}
-
-func (h *Handler) showDeleteConfirm(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
-	view, err := h.queue.EventView(ctx, eventID)
-	if errors.Is(err, domain.ErrEventNotFound) {
-		return h.editMenu(ctx, query, texts.EventGone, backKeyboard())
-	}
-
-	if err != nil {
-		return err
-	}
-
-	return h.editMenu(ctx, query, texts.DeleteConfirm(view.Event.Title), deleteConfirmKeyboard(eventID))
 }
 
 func eventsKeyboard(events []domain.Event) *telego.InlineKeyboardMarkup {
@@ -257,7 +277,25 @@ func menuKeyboard(view appqueue.View) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func membersKeyboard(view appqueue.View, p page) *telego.InlineKeyboardMarkup {
+func deleteConfirmKeyboard(eventID int64) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			button(
+				texts.ButtonConfirmDelete, domain.Action{
+					Kind:    domain.ActionDeleteConfirm,
+					EventID: eventID,
+				},
+			),
+			button(
+				texts.ButtonCancel, domain.Action{
+					Kind:    domain.ActionMenu,
+					EventID: eventID,
+				},
+			),
+		),
+	)
+}
+
 	eventID := view.Event.ID
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
@@ -298,25 +336,6 @@ func membersKeyboard(view appqueue.View, p page) *telego.InlineKeyboardMarkup {
 	)
 
 	return tu.InlineKeyboard(rows...)
-}
-
-func deleteConfirmKeyboard(eventID int64) *telego.InlineKeyboardMarkup {
-	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(
-			button(
-				texts.ButtonConfirmDelete, domain.Action{
-					Kind:    domain.ActionDeleteConfirm,
-					EventID: eventID,
-				},
-			),
-			button(
-				texts.ButtonCancel, domain.Action{
-					Kind:    domain.ActionMenu,
-					EventID: eventID,
-				},
-			),
-		),
-	)
 }
 
 func backKeyboard() *telego.InlineKeyboardMarkup {
