@@ -176,6 +176,63 @@ func (r *EventRepository) ListOpenIDs(ctx context.Context) ([]int64, error) {
 	return ids, nil
 }
 
+func (r *EventRepository) ListOpenWithUser(ctx context.Context, userID int64) ([]domain.Event, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const query = `
+		SELECT e.id, e.chat_id, e.thread_id, e.message_id, e.title, e.status, e.created_at, e.closed_at
+		FROM events AS e
+		JOIN queue_entries AS q 
+		    ON q.event_id = e.id
+		WHERE e.status = 'open' AND e.message_id IS NOT NULL AND q.user_id = ?
+		ORDER BY e.id
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("query open events with user: %w", err)
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var events []domain.Event
+
+	for rows.Next() {
+		var (
+			event     domain.Event
+			messageID sql.NullInt64
+			status    string
+			createdAt int64
+			closedAt  sql.NullInt64
+		)
+
+		err := rows.Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status, &createdAt, &closedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan event: %w", err)
+		}
+
+		event.MessageID = int(messageID.Int64)
+		event.Status = domain.Status(status)
+		event.CreatedAt = time.Unix(createdAt, 0)
+
+		if closedAt.Valid {
+			t := time.Unix(closedAt.Int64, 0)
+			event.ClosedAt = &t
+		}
+
+		events = append(events, event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate open events with user: %w", err)
+	}
+
+	return events, nil
+}
+
 func (r *EventRepository) SetMessageID(ctx context.Context, eventID int64, messageID int) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

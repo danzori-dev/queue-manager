@@ -12,6 +12,7 @@ type EventRepository interface {
 	Get(ctx context.Context, eventID int64) (domain.Event, error)
 	ListRecent(ctx context.Context, limit int) ([]domain.Event, error)
 	ListOpenIDs(ctx context.Context) ([]int64, error)
+	ListOpenWithUser(ctx context.Context, userID int64) ([]domain.Event, error)
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	Delete(ctx context.Context, eventID int64) error

@@ -11,33 +11,9 @@ import (
 )
 
 func (s *Service) SwapTargets(ctx context.Context, userID int64) ([]domain.Event, error) {
-	ids, err := s.events.ListOpenIDs(ctx)
+	events, err := s.events.ListOpenWithUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list open events: %w", err)
-	}
-
-	var events []domain.Event
-
-	for _, id := range ids {
-		position, err := s.entries.Position(ctx, id, userID)
-		if err != nil {
-			return nil, fmt.Errorf("get position: %w", err)
-		}
-
-		if position == 0 {
-			continue
-		}
-
-		event, err := s.events.Get(ctx, id)
-		if errors.Is(err, domain.ErrEventNotFound) {
-			continue
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		events = append(events, event)
+		return nil, fmt.Errorf("list open events with user: %w", err)
 	}
 
 	return events, nil
