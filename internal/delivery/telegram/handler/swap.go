@@ -133,9 +133,7 @@ func (h *Handler) sendSwap(ctx context.Context, query telego.CallbackQuery, even
 func (h *Handler) resolveSwap(ctx context.Context, query telego.CallbackQuery, a domain.Action) (string, error) {
 	switch a.Kind {
 	case domain.ActionSwapAccept:
-		req, err := h.swaps.AcceptSwap(ctx, a.EventID, query.From.ID)
-
-		return h.finishAccept(ctx, query, req, err)
+		return h.acceptSwap(ctx, query, a.EventID)
 
 	case domain.ActionSwapDecline:
 		req, err := h.swaps.DeclineSwap(ctx, a.EventID, query.From.ID)
@@ -144,7 +142,7 @@ func (h *Handler) resolveSwap(ctx context.Context, query telego.CallbackQuery, a
 		}
 
 		h.notify(ctx, req.FromID, texts.SwapDeclinedForInitiator(h.studentName(req.ToID), req.Event.Title))
-		h.deleteFrom(ctx, req.FromID, req.FromMessageID)
+		h.deleteMessage(ctx, req.FromID, req.FromMessageID)
 
 		return "", h.editMenu(ctx, query, texts.SwapDeclined, noButtons())
 
@@ -154,19 +152,21 @@ func (h *Handler) resolveSwap(ctx context.Context, query telego.CallbackQuery, a
 			return h.swapGone(ctx, query, err)
 		}
 
-		h.deleteFrom(ctx, req.ToID, req.ToMessageID)
+		h.deleteMessage(ctx, req.ToID, req.ToMessageID)
 
 		return "", h.editMenu(ctx, query, texts.SwapCanceled, noButtons())
 	}
 }
 
-func (h *Handler) finishAccept(ctx context.Context, query telego.CallbackQuery, req domain.SwapRequest, err error) (string, error) {
+func (h *Handler) acceptSwap(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
+	req, err := h.swaps.AcceptSwap(ctx, requestID, query.From.ID)
+
 	switch {
 	case errors.Is(err, domain.ErrSwapChanged),
 		errors.Is(err, domain.ErrEventClosed),
 		errors.Is(err, domain.ErrEventNotFound):
 		h.notify(ctx, req.FromID, texts.SwapFailedForInitiator(req.Event.Title))
-		h.deleteFrom(ctx, req.FromID, req.FromMessageID)
+		h.deleteMessage(ctx, req.FromID, req.FromMessageID)
 
 		return "", h.editMenu(ctx, query, texts.SwapChanged, noButtons())
 
@@ -175,7 +175,7 @@ func (h *Handler) finishAccept(ctx context.Context, query telego.CallbackQuery, 
 	}
 
 	h.notify(ctx, req.FromID, texts.SwapAcceptedForInitiator(h.studentName(req.ToID), req.Event.Title, req.ToPos))
-	h.deleteFrom(ctx, req.FromID, req.FromMessageID)
+	h.deleteMessage(ctx, req.FromID, req.FromMessageID)
 
 	return "", h.editMenu(ctx, query, texts.SwapAcceptedForAddressee(req.FromPos), noButtons())
 }
@@ -203,28 +203,6 @@ func (h *Handler) notify(ctx context.Context, userID int64, text string) {
 		h.log.WarnContext(
 			ctx, "notify swap participant",
 			slog.Int64("target_user_id", userID),
-			slog.Any("err", err),
-		)
-	}
-}
-
-func (h *Handler) deleteFrom(ctx context.Context, userID int64, messageID int) {
-	if messageID == 0 {
-		return
-	}
-
-	reqCtx, cancel := context.WithTimeout(ctx, h.apiTimeout)
-	defer cancel()
-
-	err := h.bot.DeleteMessage(
-		reqCtx, &telego.DeleteMessageParams{
-			ChatID:    tu.ID(userID),
-			MessageID: messageID,
-		},
-	)
-	if err != nil {
-		h.log.DebugContext(
-			ctx, "delete swap request",
 			slog.Any("err", err),
 		)
 	}

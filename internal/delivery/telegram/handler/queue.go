@@ -28,7 +28,7 @@ func (h *Handler) HandleSetTopic(ctx *th.Context, msg telego.Message) error {
 		return err
 	}
 
-	h.deleteMessage(ctx, msg)
+	h.deleteMessage(ctx, msg.Chat.ID, msg.MessageID)
 
 	if replaced {
 		return h.sendHTML(ctx, msg, texts.QueueTopicChanged)

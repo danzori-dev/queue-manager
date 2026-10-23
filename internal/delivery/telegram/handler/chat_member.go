@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log/slog"
+
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 )
@@ -15,7 +17,10 @@ func (h *Handler) HandleMyChatMember(ctx *th.Context, update telego.ChatMemberUp
 		return nil
 	}
 
-	h.log.WarnContext(ctx, "bot removed from chat: "+update.Chat.Title)
+	h.log.WarnContext(
+		ctx, "bot removed from chat",
+		slog.String("chat_title", update.Chat.Title),
+	)
 
 	return nil
 }

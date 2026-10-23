@@ -124,19 +124,23 @@ func (h *Handler) answer(ctx context.Context, query telego.CallbackQuery, text s
 	return nil
 }
 
-func (h *Handler) deleteMessage(ctx context.Context, msg telego.Message) {
+func (h *Handler) deleteMessage(ctx context.Context, chatID int64, messageID int) {
+	if messageID == 0 {
+		return
+	}
+
 	reqCtx, cancel := context.WithTimeout(ctx, h.apiTimeout)
 	defer cancel()
 
 	err := h.bot.DeleteMessage(
 		reqCtx, &telego.DeleteMessageParams{
-			ChatID:    tu.ID(msg.Chat.ID),
-			MessageID: msg.MessageID,
+			ChatID:    tu.ID(chatID),
+			MessageID: messageID,
 		},
 	)
 	if err != nil {
 		h.log.DebugContext(
-			ctx, "delete command message",
+			ctx, "delete message",
 			slog.Any("err", err),
 		)
 	}
@@ -162,4 +166,8 @@ func (h *Handler) userLabel(userID int64) string {
 	name, _ := h.students.Name(userID)
 
 	return texts.UserLabel(userID, name)
+}
+
+func noButtons() *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: [][]telego.InlineKeyboardButton{}}
 }

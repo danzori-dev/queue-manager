@@ -12,10 +12,7 @@ func With(ctx context.Context, attrs ...slog.Attr) context.Context {
 		return ctx
 	}
 
-	existing, ok := ctx.Value(ctxKey{}).([]slog.Attr)
-	if !ok {
-		existing = nil
-	}
+	existing := Attrs(ctx)
 
 	merged := make([]slog.Attr, 0, len(existing)+len(attrs))
 	merged = append(merged, existing...)

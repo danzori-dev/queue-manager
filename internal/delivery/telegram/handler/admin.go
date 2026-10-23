@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -107,7 +106,7 @@ func parseUserIDArg(text string) (int64, bool) {
 		return 0, false
 	}
 
-	id, err := strconv.ParseInt(strings.TrimSpace(args[0]), 10, 64)
+	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
 		return 0, false
 	}
