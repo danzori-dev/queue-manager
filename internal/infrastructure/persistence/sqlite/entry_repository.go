@@ -105,7 +105,7 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 	defer cancel()
 
 	const query = `
-		SELECT id, user_id, username
+		SELECT user_id, username
 		FROM queue_entries
 		WHERE event_id = ?
 		ORDER BY sort_key
@@ -123,9 +123,9 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 	var entries []domain.Entry
 
 	for rows.Next() {
-		entry := domain.Entry{EventID: eventID}
+		var entry domain.Entry
 
-		if err := rows.Scan(&entry.ID, &entry.UserID, &entry.Username); err != nil {
+		if err := rows.Scan(&entry.UserID, &entry.Username); err != nil {
 			return nil, fmt.Errorf("scan entry: %w", err)
 		}
 

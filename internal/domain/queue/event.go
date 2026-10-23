@@ -2,7 +2,6 @@ package queue
 
 import (
 	"strings"
-	"time"
 	"unicode/utf8"
 )
 
@@ -22,8 +21,6 @@ type Event struct {
 	MessageID int
 	Title     string
 	Status    Status
-	CreatedAt time.Time
-	ClosedAt  *time.Time
 }
 
 func NewEvent(target Target, title string) (Event, error) {

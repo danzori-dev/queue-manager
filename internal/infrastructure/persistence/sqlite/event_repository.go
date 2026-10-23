@@ -47,37 +47,18 @@ func (r *EventRepository) Get(ctx context.Context, eventID int64) (domain.Event,
 	defer cancel()
 
 	const query = `
-		SELECT id, chat_id, thread_id, message_id, title, status, created_at, closed_at
+		SELECT id, chat_id, thread_id, message_id, title, status
 		FROM events
 		WHERE id = ?
 	`
 
-	var (
-		event     domain.Event
-		messageID sql.NullInt64
-		status    string
-		createdAt int64
-		closedAt  sql.NullInt64
-	)
-
-	err := r.db.
-		QueryRowContext(ctx, query, eventID).
-		Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status, &createdAt, &closedAt)
+	event, err := scanEvent(r.db.QueryRowContext(ctx, query, eventID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Event{}, domain.ErrEventNotFound
 	}
 
 	if err != nil {
 		return domain.Event{}, fmt.Errorf("query event: %w", err)
-	}
-
-	event.MessageID = int(messageID.Int64)
-	event.Status = domain.Status(status)
-	event.CreatedAt = time.Unix(createdAt, 0)
-
-	if closedAt.Valid {
-		t := time.Unix(closedAt.Int64, 0)
-		event.ClosedAt = &t
 	}
 
 	return event, nil
@@ -88,51 +69,15 @@ func (r *EventRepository) ListRecent(ctx context.Context, limit int) ([]domain.E
 	defer cancel()
 
 	const query = `
-		SELECT id, chat_id, thread_id, message_id, title, status, created_at, closed_at
+		SELECT id, chat_id, thread_id, message_id, title, status
 		FROM events
 		ORDER BY id DESC
 		LIMIT ?
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, limit)
+	events, err := r.queryEvents(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query recent events: %w", err)
-	}
-
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	var events []domain.Event
-
-	for rows.Next() {
-		var (
-			event     domain.Event
-			messageID sql.NullInt64
-			status    string
-			createdAt int64
-			closedAt  sql.NullInt64
-		)
-
-		err := rows.Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status, &createdAt, &closedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan event: %w", err)
-		}
-
-		event.MessageID = int(messageID.Int64)
-		event.Status = domain.Status(status)
-		event.CreatedAt = time.Unix(createdAt, 0)
-
-		if closedAt.Valid {
-			t := time.Unix(closedAt.Int64, 0)
-			event.ClosedAt = &t
-		}
-
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate recent events: %w", err)
 	}
 
 	return events, nil
@@ -146,6 +91,7 @@ func (r *EventRepository) ListOpenIDs(ctx context.Context) ([]int64, error) {
 		SELECT id
 		FROM events
 		WHERE status = 'open' AND message_id IS NOT NULL
+		ORDER BY id
 	`
 
 	rows, err := r.db.QueryContext(ctx, query)
@@ -181,53 +127,17 @@ func (r *EventRepository) ListOpenWithUser(ctx context.Context, userID int64) ([
 	defer cancel()
 
 	const query = `
-		SELECT e.id, e.chat_id, e.thread_id, e.message_id, e.title, e.status, e.created_at, e.closed_at
+		SELECT e.id, e.chat_id, e.thread_id, e.message_id, e.title, e.status
 		FROM events AS e
-		JOIN queue_entries AS q 
+		JOIN queue_entries AS q
 		    ON q.event_id = e.id
 		WHERE e.status = 'open' AND e.message_id IS NOT NULL AND q.user_id = ?
 		ORDER BY e.id
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	events, err := r.queryEvents(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("query open events with user: %w", err)
-	}
-
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	var events []domain.Event
-
-	for rows.Next() {
-		var (
-			event     domain.Event
-			messageID sql.NullInt64
-			status    string
-			createdAt int64
-			closedAt  sql.NullInt64
-		)
-
-		err := rows.Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status, &createdAt, &closedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan event: %w", err)
-		}
-
-		event.MessageID = int(messageID.Int64)
-		event.Status = domain.Status(status)
-		event.CreatedAt = time.Unix(createdAt, 0)
-
-		if closedAt.Valid {
-			t := time.Unix(closedAt.Int64, 0)
-			event.ClosedAt = &t
-		}
-
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate open events with user: %w", err)
 	}
 
 	return events, nil
@@ -280,7 +190,7 @@ func (r *EventRepository) Delete(ctx context.Context, eventID int64) error {
 
 		deleteEventQuery = `
 			DELETE FROM events
-			WHERE id = ?			
+			WHERE id = ?
 		`
 	)
 
@@ -352,4 +262,53 @@ func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Ti
 	}
 
 	return int(deleted), nil
+}
+
+func (r *EventRepository) queryEvents(ctx context.Context, query string, args ...any) ([]domain.Event, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var events []domain.Event
+
+	for rows.Next() {
+		event, err := scanEvent(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan event: %w", err)
+		}
+
+		events = append(events, event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate events: %w", err)
+	}
+
+	return events, nil
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEvent(row rowScanner) (domain.Event, error) {
+	var (
+		event     domain.Event
+		messageID sql.NullInt64
+		status    string
+	)
+
+	if err := row.Scan(&event.ID, &event.ChatID, &event.ThreadID, &messageID, &event.Title, &status); err != nil {
+		return domain.Event{}, err
+	}
+
+	event.MessageID = int(messageID.Int64)
+	event.Status = domain.Status(status)
+
+	return event, nil
 }
