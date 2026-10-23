@@ -67,20 +67,20 @@ func (s *Service) SetQueueTopic(ctx context.Context, chatID int64, threadID int)
 	return replaced, nil
 }
 
-func (s *Service) CreateEvent(ctx context.Context, title string) (domain.Event, error) {
+func (s *Service) CreateEvent(ctx context.Context, title string) error {
 	target, err := s.targets.Target(ctx)
 	if err != nil {
-		return domain.Event{}, fmt.Errorf("get queue target: %w", err)
+		return fmt.Errorf("get queue target: %w", err)
 	}
 
 	event, err := domain.NewEvent(target, title)
 	if err != nil {
-		return domain.Event{}, err
+		return err
 	}
 
 	event.ID, err = s.events.Create(ctx, event)
 	if err != nil {
-		return domain.Event{}, fmt.Errorf("create event: %w", err)
+		return fmt.Errorf("create event: %w", err)
 	}
 
 	messageID, err := s.messages.Publish(ctx, View{Event: event})
@@ -88,28 +88,21 @@ func (s *Service) CreateEvent(ctx context.Context, title string) (domain.Event, 
 		publishErr := fmt.Errorf("publish event: %w", err)
 
 		if delErr := s.events.Delete(context.WithoutCancel(ctx), event.ID); delErr != nil {
-			return domain.Event{}, errors.Join(publishErr, fmt.Errorf("delete unpublished event: %w", delErr))
+			return errors.Join(publishErr, fmt.Errorf("delete unpublished event: %w", delErr))
 		}
 
-		return domain.Event{}, publishErr
+		return publishErr
 	}
 
 	if err := s.events.SetMessageID(ctx, event.ID, messageID); err != nil {
-		return domain.Event{}, fmt.Errorf("save message id: %w", err)
+		return fmt.Errorf("save message id: %w", err)
 	}
 
-	event.MessageID = messageID
-
-	return event, nil
+	return nil
 }
 
 func (s *Service) Join(ctx context.Context, eventID, userID int64, username string) (JoinResult, error) {
-	event, err := s.events.Get(ctx, eventID)
-	if err != nil {
-		return JoinResult{}, err
-	}
-
-	if err := event.CanJoin(); err != nil {
+	if _, err := s.loadOpenEvent(ctx, eventID); err != nil {
 		return JoinResult{}, err
 	}
 
@@ -134,12 +127,7 @@ func (s *Service) Join(ctx context.Context, eventID, userID int64, username stri
 }
 
 func (s *Service) Leave(ctx context.Context, eventID, userID int64) (bool, error) {
-	event, err := s.events.Get(ctx, eventID)
-	if err != nil {
-		return false, err
-	}
-
-	if err := event.CanJoin(); err != nil {
+	if _, err := s.loadOpenEvent(ctx, eventID); err != nil {
 		return false, err
 	}
 
@@ -156,12 +144,7 @@ func (s *Service) Leave(ctx context.Context, eventID, userID int64) (bool, error
 }
 
 func (s *Service) Skip(ctx context.Context, eventID, userID int64) (int, error) {
-	event, err := s.events.Get(ctx, eventID)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := event.CanJoin(); err != nil {
+	if _, err := s.loadOpenEvent(ctx, eventID); err != nil {
 		return 0, err
 	}
 
@@ -302,22 +285,9 @@ func (s *Service) view(ctx context.Context, event domain.Event) (View, error) {
 		return View{}, fmt.Errorf("list entries: %w", err)
 	}
 
-	lines := make([]Line, 0, len(entries))
-
-	for i, e := range entries {
-		lines = append(
-			lines, Line{
-				Position: i + 1,
-				UserID:   e.UserID,
-				Name:     s.studentName(e.UserID),
-				UserName: e.Username,
-			},
-		)
-	}
-
 	return View{
 		Event: event,
-		Lines: lines,
+		Lines: s.lines(entries, 1),
 	}, nil
 }
 
@@ -359,4 +329,34 @@ func (s *Service) studentName(userID int64) string {
 	}
 
 	return fmt.Sprintf("id%d", userID)
+}
+
+func (s *Service) loadOpenEvent(ctx context.Context, eventID int64) (domain.Event, error) {
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return domain.Event{}, err
+	}
+
+	if err := event.CanJoin(); err != nil {
+		return domain.Event{}, err
+	}
+
+	return event, nil
+}
+
+func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
+	lines := make([]Line, 0, len(entries))
+
+	for i, e := range entries {
+		lines = append(
+			lines, Line{
+				Position: firstPos + i,
+				UserID:   e.UserID,
+				Name:     s.studentName(e.UserID),
+				UserName: e.Username,
+			},
+		)
+	}
+
+	return lines
 }

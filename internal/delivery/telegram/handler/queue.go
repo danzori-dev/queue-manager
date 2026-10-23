@@ -46,7 +46,7 @@ func (h *Handler) HandleNew(ctx *th.Context, msg telego.Message) error {
 		return err
 	}
 
-	_, err := h.queue.CreateEvent(ctx, commandArgs(msg.Text))
+	err := h.queue.CreateEvent(ctx, commandArgs(msg.Text))
 
 	switch {
 	case errors.Is(err, queue.ErrTargetNotSet):

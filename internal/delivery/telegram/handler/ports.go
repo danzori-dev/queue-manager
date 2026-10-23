@@ -24,7 +24,7 @@ type StudentService interface {
 //nolint:interfacebloat // mirrors the queue service used by the handlers
 type QueueService interface {
 	SetQueueTopic(ctx context.Context, chatID int64, threadID int) (bool, error)
-	CreateEvent(ctx context.Context, title string) (domain.Event, error)
+	CreateEvent(ctx context.Context, title string) error
 	Join(ctx context.Context, eventID, userID int64, username string) (appqueue.JoinResult, error)
 	Leave(ctx context.Context, eventID, userID int64) (bool, error)
 	Skip(ctx context.Context, eventID, userID int64) (int, error)

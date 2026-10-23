@@ -44,12 +44,8 @@ func (s *Service) SwapTargets(ctx context.Context, userID int64) ([]domain.Event
 }
 
 func (s *Service) SwapCandidates(ctx context.Context, eventID, userID int64) (View, error) {
-	event, err := s.events.Get(ctx, eventID)
+	event, err := s.loadOpenEvent(ctx, eventID)
 	if err != nil {
-		return View{}, err
-	}
-
-	if err := event.CanJoin(); err != nil {
 		return View{}, err
 	}
 
@@ -75,12 +71,8 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		return domain.SwapRequest{}, domain.ErrSwapSelf
 	}
 
-	event, err := s.events.Get(ctx, eventID)
+	event, err := s.loadOpenEvent(ctx, eventID)
 	if err != nil {
-		return domain.SwapRequest{}, err
-	}
-
-	if err := event.CanJoin(); err != nil {
 		return domain.SwapRequest{}, err
 	}
 
@@ -114,10 +106,6 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 	if err != nil {
 		s.swaps.remove(req.ID)
 
-		if errors.Is(err, domain.ErrSwapUnreachable) {
-			return domain.SwapRequest{}, err
-		}
-
 		return domain.SwapRequest{}, fmt.Errorf("ask swap: %w", err)
 	}
 
@@ -133,12 +121,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (doma
 		return req, err
 	}
 
-	event, err := s.events.Get(ctx, req.Event.ID)
-	if err != nil {
-		return req, err
-	}
-
-	if err := event.CanJoin(); err != nil {
+	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
 		return req, err
 	}
 
