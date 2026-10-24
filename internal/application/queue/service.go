@@ -74,15 +74,17 @@ func (s *Service) loadOpenEvent(ctx context.Context, eventID int64) (domain.Even
 func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
 	lines := make([]Line, 0, len(entries))
 
-	for i, e := range entries {
-		lines = append(
-			lines, Line{
-				Position: firstPos + i,
-				UserID:   e.UserID,
-				Name:     s.studentName(e.UserID),
-				UserName: e.Username,
-			},
-		)
+	for i, place := range domain.Places(entries) {
+		for _, e := range place {
+			lines = append(
+				lines, Line{
+					Position: firstPos + i,
+					UserID:   e.UserID,
+					Name:     s.studentName(e.UserID),
+					UserName: e.Username,
+				},
+			)
+		}
 	}
 
 	return lines

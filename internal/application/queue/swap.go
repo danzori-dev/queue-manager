@@ -149,16 +149,9 @@ func (s *Service) positions(ctx context.Context, eventID, userA, userB int64) (p
 		return 0, 0, fmt.Errorf("list entries: %w", err)
 	}
 
-	posA = slices.IndexFunc(
-		entries, func(e domain.Entry) bool {
-			return e.UserID == userA
-		},
-	) + 1
-	posB = slices.IndexFunc(
-		entries, func(e domain.Entry) bool {
-			return e.UserID == userB
-		},
-	) + 1
+	places := domain.Places(entries)
+	posA = domain.PlaceOf(places, userA)
+	posB = domain.PlaceOf(places, userB)
 
 	if posA == 0 || posB == 0 {
 		return 0, 0, domain.ErrNotInQueue

@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -61,13 +62,15 @@ func (s *Service) carry(ctx context.Context, fromID int64, fromPos int, toID int
 		return carryInput{}, fmt.Errorf("list entries: %w", err)
 	}
 
-	if fromPos < 1 || fromPos > len(entries) {
+	places := domain.Places(entries)
+
+	if fromPos < 1 || fromPos > len(places) {
 		return carryInput{}, domain.ErrCarryPosition
 	}
 
 	return carryInput{
 		from:    from,
 		to:      to,
-		entries: entries[fromPos-1:],
+		entries: slices.Concat(places[fromPos-1:]...),
 	}, nil
 }
