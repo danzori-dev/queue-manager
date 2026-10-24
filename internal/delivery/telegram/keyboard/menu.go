@@ -44,7 +44,7 @@ func Menu(view appqueue.View) *telego.InlineKeyboardMarkup {
 			Kind:    callback.ActionClose,
 			EventID: eventID,
 		},
-	)
+	).WithStyle(telego.ButtonStyleDanger)
 
 	if view.Event.Status == domain.StatusClosed {
 		toggle = button(
@@ -52,7 +52,7 @@ func Menu(view appqueue.View) *telego.InlineKeyboardMarkup {
 				Kind:    callback.ActionOpen,
 				EventID: eventID,
 			},
-		)
+		).WithStyle(telego.ButtonStyleSuccess)
 	}
 
 	return tu.InlineKeyboard(
@@ -78,7 +78,7 @@ func Menu(view appqueue.View) *telego.InlineKeyboardMarkup {
 					Kind:    callback.ActionDelete,
 					EventID: eventID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleDanger),
 		),
 		tu.InlineKeyboardRow(button(texts.ButtonBack, callback.Action{Kind: callback.ActionList})),
 	)
@@ -92,7 +92,7 @@ func DeleteConfirm(eventID int64) *telego.InlineKeyboardMarkup {
 					Kind:    callback.ActionDeleteConfirm,
 					EventID: eventID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleDanger),
 			button(
 				texts.ButtonCancel, callback.Action{
 					Kind:    callback.ActionMenu,

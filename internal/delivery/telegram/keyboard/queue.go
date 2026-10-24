@@ -26,13 +26,13 @@ func Queue(view appqueue.View, botUsername string) *telego.InlineKeyboardMarkup 
 					Kind:    callback.ActionJoin,
 					EventID: view.Event.ID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleSuccess),
 			button(
 				texts.ButtonLeave, callback.Action{
 					Kind:    callback.ActionLeave,
 					EventID: view.Event.ID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleDanger),
 		),
 		tu.InlineKeyboardRow(
 			button(

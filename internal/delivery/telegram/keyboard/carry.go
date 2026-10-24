@@ -16,7 +16,7 @@ func Carry(fromID int64) *telego.InlineKeyboardMarkup {
 					Kind:    callback.ActionCarry,
 					EventID: fromID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleSuccess),
 			button(
 				texts.ButtonCancel, callback.Action{
 					Kind:    callback.ActionCarryCancel,
