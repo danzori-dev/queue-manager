@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"strings"
+	"time"
 
 	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -18,6 +19,7 @@ const (
 	ButtonOpen          = "Открыть запись"
 	ButtonRefresh       = "Обновить"
 	ButtonMembers       = "Участники"
+	ButtonRename        = "Переименовать"
 	ButtonDelete        = "Удалить очередь"
 	ButtonConfirmDelete = "Да, удалить"
 	ButtonBack          = "← К списку"
@@ -30,6 +32,9 @@ const (
 	ParticipantRemoved  = "Студент убран из очереди."
 	ParticipantNotFound = "Этого студента уже нет в очереди."
 
+	EventRenamed = "Название изменено."
+	RenameUsage  = "Использование: <code>/rename &lt;id&gt; &lt;название&gt;</code>"
+	TitleEmpty   = "Название не может быть пустым. Отправь другое."
 	EventDeleted = "Очередь удалена."
 
 	queueEmpty = "В очереди никого нет."
@@ -71,6 +76,13 @@ func EventMembers(view appqueue.View, page, pages int) string {
 	}
 
 	return header + "Нажми на студента, чтобы убрать его из очереди." + pageLine(page, pages)
+}
+
+func RenamePrompt(title string, ttl time.Duration) string {
+	return fmt.Sprintf(
+		"Отправь новое название для очереди «%s».\n\nНа ответ есть %d мин.",
+		html.EscapeString(title), int(ttl.Minutes()),
+	)
 }
 
 func DeleteConfirm(title string) string {

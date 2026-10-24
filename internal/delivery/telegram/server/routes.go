@@ -54,14 +54,16 @@ func RegisterRoutes(p RouteParams) Register {
 		)
 
 		private.HandleMessage(p.Handlers.Menu.Events, th.CommandEqual("events"))
+		private.HandleMessage(p.Handlers.Menu.Rename, th.CommandEqual("rename"))
 		bh.HandleCallbackQuery(
 			p.Handlers.Menu.Callback, th.AnyCallbackQueryWithMessage(),
 			actions(
 				callback.ActionList, callback.ActionMenu, callback.ActionClose, callback.ActionOpen,
-				callback.ActionDelete, callback.ActionDeleteConfirm, callback.ActionKick, callback.ActionMembers,
-				callback.ActionCarry, callback.ActionCarryCancel,
+				callback.ActionRename, callback.ActionRenameCancel, callback.ActionDelete, callback.ActionDeleteConfirm,
+				callback.ActionKick, callback.ActionMembers, callback.ActionCarry, callback.ActionCarryCancel,
 			),
 		)
+		private.HandleMessage(p.Handlers.Menu.Text, th.AnyMessageWithText(), th.Not(th.AnyCommand()))
 
 		private.HandleMessage(p.Handlers.Carry.Carry, th.CommandEqual("carry"))
 

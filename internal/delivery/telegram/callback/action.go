@@ -20,6 +20,8 @@ const (
 	ActionOpen          ActionKind = "open"
 	ActionDelete        ActionKind = "delete"
 	ActionDeleteConfirm ActionKind = "delconfirm"
+	ActionRename        ActionKind = "rename"
+	ActionRenameCancel  ActionKind = "renamecancel"
 	ActionKick          ActionKind = "kick"
 	ActionMembers       ActionKind = "members"
 	ActionSkip          ActionKind = "skip"
