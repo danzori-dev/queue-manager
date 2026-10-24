@@ -24,14 +24,9 @@ type Event struct {
 }
 
 func NewEvent(target Target, title string) (Event, error) {
-	title = strings.TrimSpace(title)
-
-	switch {
-	case title == "":
-		return Event{}, ErrEmptyTitle
-
-	case utf8.RuneCountInString(title) > MaxTitleLength:
-		return Event{}, ErrTitleTooLong
+	title, err := NormalizeTitle(title)
+	if err != nil {
+		return Event{}, err
 	}
 
 	return Event{
@@ -48,4 +43,18 @@ func (e Event) CanJoin() error {
 	}
 
 	return nil
+}
+
+func NormalizeTitle(title string) (string, error) {
+	title = strings.TrimSpace(title)
+
+	switch {
+	case title == "":
+		return "", ErrEmptyTitle
+
+	case utf8.RuneCountInString(title) > MaxTitleLength:
+		return "", ErrTitleTooLong
+	}
+
+	return title, nil
 }

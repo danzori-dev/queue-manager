@@ -74,6 +74,14 @@ func Menu(view appqueue.View) *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(
 			button(
+				texts.ButtonRename, callback.Action{
+					Kind:    callback.ActionRename,
+					EventID: eventID,
+				},
+			),
+		),
+		tu.InlineKeyboardRow(
+			button(
 				texts.ButtonDelete, callback.Action{
 					Kind:    callback.ActionDelete,
 					EventID: eventID,
@@ -96,6 +104,19 @@ func DeleteConfirm(eventID int64) *telego.InlineKeyboardMarkup {
 			button(
 				texts.ButtonCancel, callback.Action{
 					Kind:    callback.ActionMenu,
+					EventID: eventID,
+				},
+			),
+		),
+	)
+}
+
+func RenameCancel(eventID int64) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			button(
+				texts.ButtonCancel, callback.Action{
+					Kind:    callback.ActionRenameCancel,
 					EventID: eventID,
 				},
 			),

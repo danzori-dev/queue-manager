@@ -64,6 +64,30 @@ func (s *Service) CreateEvent(ctx context.Context, title string) error {
 	return nil
 }
 
+func (s *Service) RenameEvent(ctx context.Context, eventID int64, title string) error {
+	title, err := domain.NormalizeTitle(title)
+	if err != nil {
+		return err
+	}
+
+	event, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	if event.Title == title {
+		return nil
+	}
+
+	if err := s.events.SetTitle(ctx, eventID, title); err != nil {
+		return fmt.Errorf("set event title: %w", err)
+	}
+
+	s.scheduler.Schedule(eventID)
+
+	return nil
+}
+
 func (s *Service) OpenEventIDs(ctx context.Context) ([]int64, error) {
 	ids, err := s.events.ListOpenIDs(ctx)
 	if err != nil {

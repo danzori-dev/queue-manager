@@ -178,6 +178,23 @@ func (r *EventRepository) SetStatus(ctx context.Context, eventID int64, status d
 	return nil
 }
 
+func (r *EventRepository) SetTitle(ctx context.Context, eventID int64, title string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const query = `
+		UPDATE events
+		SET title = ?
+		WHERE id = ?
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, title, eventID); err != nil {
+		return fmt.Errorf("update event title: %w", err)
+	}
+
+	return nil
+}
+
 func (r *EventRepository) Delete(ctx context.Context, eventID int64) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

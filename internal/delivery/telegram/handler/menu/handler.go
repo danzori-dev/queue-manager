@@ -8,6 +8,7 @@ import (
 	th "github.com/mymmrac/telego/telegohandler"
 
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/callback"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/command"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/confirm"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/keyboard"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/reply"
@@ -22,6 +23,7 @@ type Handler struct {
 	queues   QueueService
 	carries  CarryActions
 	confirms *confirm.DoublePress
+	renames  *renames
 }
 
 func New(replier *reply.Replier, queues QueueService, carries CarryActions) *Handler {
@@ -30,6 +32,7 @@ func New(replier *reply.Replier, queues QueueService, carries CarryActions) *Han
 		queues:   queues,
 		carries:  carries,
 		confirms: confirm.New(),
+		renames:  newRenames(),
 	}
 }
 
@@ -37,6 +40,8 @@ func (h *Handler) Events(ctx *th.Context, msg telego.Message) error {
 	if ok, err := h.reply.Allowed(ctx, msg, access.RoleAdmin); !ok {
 		return err
 	}
+
+	h.renames.Drop(msg.From.ID)
 
 	events, err := h.queues.Events(ctx)
 	if err != nil {
@@ -60,6 +65,10 @@ func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
 		return h.reply.Answer(ctx, query, "")
 	}
 
+	if action.Kind != callback.ActionRename {
+		h.renames.Drop(query.From.ID)
+	}
+
 	text, err := h.applyMenuAction(ctx, query, action)
 	if err != nil {
 		_ = h.reply.Answer(ctx, query, texts.InternalError)
@@ -70,12 +79,52 @@ func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
 	return h.reply.Answer(ctx, query, text)
 }
 
+func (h *Handler) Rename(ctx *th.Context, msg telego.Message) error {
+	if ok, err := h.reply.Allowed(ctx, msg, access.RoleAdmin); !ok {
+		return err
+	}
+
+	eventID, title, ok := command.IDAndText(msg.Text)
+	if !ok {
+		return h.reply.SendHTML(ctx, msg, texts.RenameUsage)
+	}
+
+	h.renames.Drop(msg.From.ID)
+
+	_, err := h.rename(ctx, msg, eventID, title)
+
+	return err
+}
+
+func (h *Handler) Text(ctx *th.Context, msg telego.Message) error {
+	if !middleware.RoleFromContext(ctx).AtLeast(access.RoleAdmin) {
+		return nil
+	}
+
+	eventID, ok := h.renames.Take(msg.From.ID)
+	if !ok {
+		return nil
+	}
+
+	renamed, err := h.rename(ctx, msg, eventID, msg.Text)
+	if err != nil || !renamed {
+		return err
+	}
+
+	view, err := h.queues.EventView(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	return h.reply.SendMenu(ctx, msg, texts.EventMenu(view), keyboard.Menu(view))
+}
+
 func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
 	switch a.Kind {
 	case callback.ActionList:
 		return "", h.showEvents(ctx, query)
 
-	case callback.ActionMenu:
+	case callback.ActionMenu, callback.ActionRenameCancel:
 		return "", h.showMenu(ctx, query, a.EventID)
 
 	case callback.ActionClose:
@@ -83,6 +132,9 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 
 	case callback.ActionOpen:
 		return h.openEvent(ctx, query, a.EventID)
+
+	case callback.ActionRename:
+		return "", h.askRename(ctx, query, a.EventID)
 
 	case callback.ActionDelete:
 		return "", h.showDeleteConfirm(ctx, query, a.EventID)
@@ -157,6 +209,45 @@ func (h *Handler) openEvent(ctx context.Context, query telego.CallbackQuery, eve
 	}
 
 	return texts.EventOpenedAnswer, h.showMenu(ctx, query, eventID)
+}
+
+func (h *Handler) rename(ctx context.Context, msg telego.Message, eventID int64, title string) (bool, error) {
+	err := h.queues.RenameEvent(ctx, eventID, title)
+
+	switch {
+	case errors.Is(err, domain.ErrEmptyTitle):
+		h.renames.Put(msg.From.ID, eventID)
+
+		return false, h.reply.SendHTML(ctx, msg, texts.TitleEmpty)
+
+	case errors.Is(err, domain.ErrTitleTooLong):
+		h.renames.Put(msg.From.ID, eventID)
+
+		return false, h.reply.SendHTML(ctx, msg, texts.EventTitleTooLong)
+
+	case errors.Is(err, domain.ErrEventNotFound):
+		return false, h.reply.SendHTML(ctx, msg, texts.QueueNotFound)
+
+	case err != nil:
+		return false, err
+	}
+
+	return true, h.reply.SendHTML(ctx, msg, texts.EventRenamed)
+}
+
+func (h *Handler) askRename(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
+	view, err := h.queues.EventView(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back())
+	}
+
+	if err != nil {
+		return err
+	}
+
+	h.renames.Put(query.From.ID, eventID)
+
+	return h.reply.EditMenu(ctx, query, texts.RenamePrompt(view.Event.Title, renameTTL), keyboard.RenameCancel(eventID))
 }
 
 func (h *Handler) showDeleteConfirm(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
