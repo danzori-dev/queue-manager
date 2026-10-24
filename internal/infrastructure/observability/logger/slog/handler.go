@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/danzori-dev/queue-manager/internal/application/logctx"
+	"github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logctx"
 )
 
 type contextHandler struct {

@@ -42,19 +42,19 @@ func (s *Service) SwapCandidates(ctx context.Context, eventID, userID int64) (Vi
 	return view, nil
 }
 
-func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, fromMessageID int) (domain.SwapRequest, error) {
+func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, fromMessageID int) (Swap, error) {
 	if fromID == toID {
-		return domain.SwapRequest{}, domain.ErrSwapSelf
+		return Swap{}, domain.ErrSwapSelf
 	}
 
 	event, err := s.loadOpenEvent(ctx, eventID)
 	if err != nil {
-		return domain.SwapRequest{}, err
+		return Swap{}, err
 	}
 
 	fromPos, toPos, err := s.positions(ctx, eventID, fromID, toID)
 	if err != nil {
-		return domain.SwapRequest{}, err
+		return Swap{}, err
 	}
 
 	req, err := s.swaps.add(
@@ -69,62 +69,78 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		},
 	)
 	if err != nil {
-		return domain.SwapRequest{}, err
+		return Swap{}, err
 	}
 
-	ask := SwapAsk{
-		Request:  req,
-		FromName: s.studentName(fromID),
-		ToName:   s.studentName(toID),
-	}
+	swap := s.named(req)
 
-	messageID, err := s.messages.AskSwap(ctx, ask)
+	messageID, err := s.messages.AskSwap(ctx, swap)
 	if err != nil {
 		s.swaps.remove(req.ID)
 
-		return domain.SwapRequest{}, fmt.Errorf("ask swap: %w", err)
+		return Swap{}, fmt.Errorf("ask swap: %w", err)
 	}
 
 	s.swaps.setMessage(req.ID, messageID)
-	req.ToMessageID = messageID
+	swap.ToMessageID = messageID
 
-	return req, nil
+	return swap, nil
 }
 
-func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (domain.SwapRequest, error) {
+func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap, error) {
 	req, err := s.swaps.take(requestID, userID, swapAddressee)
 	if err != nil {
-		return req, err
+		return Swap{}, err
 	}
 
+	swap := s.named(req)
+
 	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
-		return req, err
+		return swap, err
 	}
 
 	fromPos, toPos, err := s.positions(ctx, req.Event.ID, req.FromID, req.ToID)
 
 	switch {
 	case errors.Is(err, domain.ErrNotInQueue):
-		return req, domain.ErrSwapChanged
+		return swap, domain.ErrSwapChanged
 
 	case err != nil:
-		return req, err
+		return swap, err
 
 	case fromPos != req.FromPos || toPos != req.ToPos:
-		return req, domain.ErrSwapChanged
+		return swap, domain.ErrSwapChanged
 	}
 
 	if err := s.entries.SwapSortKeys(ctx, req.Event.ID, req.FromID, req.ToID); err != nil {
 		if errors.Is(err, domain.ErrNotInQueue) {
-			return req, domain.ErrSwapChanged
+			return swap, domain.ErrSwapChanged
 		}
 
-		return req, fmt.Errorf("swap sort keys: %w", err)
+		return swap, fmt.Errorf("swap sort keys: %w", err)
 	}
 
 	s.scheduler.Schedule(req.Event.ID)
 
-	return req, nil
+	return swap, nil
+}
+
+func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap, error) {
+	req, err := s.swaps.take(requestID, userID, swapAddressee)
+	if err != nil {
+		return Swap{}, err
+	}
+
+	return s.named(req), nil
+}
+
+func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, error) {
+	req, err := s.swaps.take(requestID, userID, swapInitiator)
+	if err != nil {
+		return Swap{}, err
+	}
+
+	return s.named(req), nil
 }
 
 func (s *Service) positions(ctx context.Context, eventID, userA, userB int64) (posA, posB int, err error) {
@@ -151,10 +167,10 @@ func (s *Service) positions(ctx context.Context, eventID, userA, userB int64) (p
 	return posA, posB, nil
 }
 
-func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (domain.SwapRequest, error) {
-	return s.swaps.take(requestID, userID, swapAddressee)
-}
-
-func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (domain.SwapRequest, error) {
-	return s.swaps.take(requestID, userID, swapInitiator)
+func (s *Service) named(req domain.SwapRequest) Swap {
+	return Swap{
+		SwapRequest: req,
+		FromName:    s.studentName(req.FromID),
+		ToName:      s.studentName(req.ToID),
+	}
 }

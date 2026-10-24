@@ -8,14 +8,14 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/callback"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
-	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/middleware"
-	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server/middleware"
 )
 
 type RouteParams struct {
 	Bot          *telego.Bot
-	Handler      *handler.Handler
+	Handlers     handler.Handlers
 	RoleResolver middleware.RoleResolver
 	Students     middleware.StudentLookup
 	RateLimit    middleware.RateLimitConfig
@@ -33,52 +33,49 @@ func RegisterRoutes(p RouteParams) Register {
 			middleware.RateLimit(p.RateLimit, p.Bot, p.APITimeout, p.Log),
 		)
 
-		bh.HandleMessage(p.Handler.HandleHelp, th.CommandEqual("help"))
-
-		bh.HandleMyChatMember(p.Handler.HandleMyChatMember)
-
-		bh.HandleCallbackQuery(
-			p.Handler.HandleQueueCallback, th.AnyCallbackQueryWithMessage(),
-			actions(domain.ActionJoin, domain.ActionLeave, domain.ActionSkip),
-		)
-		bh.HandleCallbackQuery(
-			p.Handler.HandleMenuCallback, th.AnyCallbackQueryWithMessage(),
-			actions(
-				domain.ActionList, domain.ActionMenu, domain.ActionClose, domain.ActionOpen,
-				domain.ActionDelete, domain.ActionDeleteConfirm, domain.ActionKick, domain.ActionMembers,
-				domain.ActionCarry, domain.ActionCarryCancel,
-			),
-		)
-		bh.HandleCallbackQuery(
-			p.Handler.HandleSwapCallback, th.AnyCallbackQueryWithMessage(),
-			actions(
-				domain.ActionSwapEvent, domain.ActionSwapPick, domain.ActionSwapPage, domain.ActionSwapSend,
-				domain.ActionSwapAbort, domain.ActionSwapAccept, domain.ActionSwapDecline, domain.ActionSwapCancel,
-			),
-		)
-
+		private := bh.Group(privateChat)
 		group := bh.Group(groupChat)
 
-		group.HandleMessage(p.Handler.HandleSetTopic, th.CommandEqual("settopic"))
+		bh.HandleMessage(p.Handlers.General.Help, th.CommandEqual("help"))
+		private.HandleMessage(p.Handlers.General.Start, th.CommandEqual("start"))
+		private.HandleMessage(p.Handlers.General.Status, th.CommandEqual("status"))
+		bh.HandleMyChatMember(p.Handlers.General.MyChatMember)
 
-		private := bh.Group(privateChat)
+		group.HandleMessage(p.Handlers.Queue.SetTopic, th.CommandEqual("settopic"))
+		private.HandleMessage(p.Handlers.Queue.Create, th.CommandEqual("new"))
+		bh.HandleCallbackQuery(
+			p.Handlers.Queue.Callback, th.AnyCallbackQueryWithMessage(),
+			actions(callback.ActionJoin, callback.ActionLeave, callback.ActionSkip),
+		)
 
-		private.HandleMessage(p.Handler.HandleStart, th.CommandEqual("start"))
-		private.HandleMessage(p.Handler.HandleNew, th.CommandEqual("new"))
-		private.HandleMessage(p.Handler.HandleEvents, th.CommandEqual("events"))
-		private.HandleMessage(p.Handler.HandleCarry, th.CommandEqual("carry"))
+		private.HandleMessage(p.Handlers.Menu.Events, th.CommandEqual("events"))
+		bh.HandleCallbackQuery(
+			p.Handlers.Menu.Callback, th.AnyCallbackQueryWithMessage(),
+			actions(
+				callback.ActionList, callback.ActionMenu, callback.ActionClose, callback.ActionOpen,
+				callback.ActionDelete, callback.ActionDeleteConfirm, callback.ActionKick, callback.ActionMembers,
+				callback.ActionCarry, callback.ActionCarryCancel,
+			),
+		)
 
-		private.HandleMessage(p.Handler.HandleSwap, th.CommandEqual("swap"))
+		private.HandleMessage(p.Handlers.Carry.Carry, th.CommandEqual("carry"))
 
-		private.HandleMessage(p.Handler.HandleAddAdmin, th.CommandEqual("addadmin"))
-		private.HandleMessage(p.Handler.HandleRmAdmin, th.CommandEqual("rmadmin"))
-		private.HandleMessage(p.Handler.HandleAdmins, th.CommandEqual("admins"))
+		private.HandleMessage(p.Handlers.Swap.Swap, th.CommandEqual("swap"))
+		bh.HandleCallbackQuery(
+			p.Handlers.Swap.Callback, th.AnyCallbackQueryWithMessage(),
+			actions(
+				callback.ActionSwapEvent, callback.ActionSwapPick, callback.ActionSwapPage, callback.ActionSwapSend,
+				callback.ActionSwapAbort, callback.ActionSwapAccept, callback.ActionSwapDecline, callback.ActionSwapCancel,
+			),
+		)
 
-		private.HandleMessage(p.Handler.HandleStudents, th.CommandEqual("students"))
-		private.HandleMessage(p.Handler.HandleImportStudents, th.CaptionCommandEqual("import_students"))
-		private.HandleMessage(p.Handler.HandleImportStudents, th.CommandEqual("import_students"))
+		private.HandleMessage(p.Handlers.Admin.Add, th.CommandEqual("addadmin"))
+		private.HandleMessage(p.Handlers.Admin.Remove, th.CommandEqual("rmadmin"))
+		private.HandleMessage(p.Handlers.Admin.List, th.CommandEqual("admins"))
 
-		private.HandleMessage(p.Handler.HandleStatus, th.CommandEqual("status"))
+		private.HandleMessage(p.Handlers.Student.List, th.CommandEqual("students"))
+		private.HandleMessage(p.Handlers.Student.Import, th.CaptionCommandEqual("import_students"))
+		private.HandleMessage(p.Handlers.Student.Import, th.CommandEqual("import_students"))
 	}
 }
 
@@ -90,7 +87,7 @@ func groupChat(_ context.Context, update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypeSupergroup
 }
 
-func actions(kinds ...domain.ActionKind) th.Predicate {
+func actions(kinds ...callback.ActionKind) th.Predicate {
 	predicates := make([]th.Predicate, 0, len(kinds))
 
 	for _, k := range kinds {

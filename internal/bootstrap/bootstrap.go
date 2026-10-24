@@ -15,15 +15,16 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/application/student"
 	"github.com/danzori-dev/queue-manager/internal/config"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler"
-	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/middleware"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/render"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server/middleware"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/cache/memory"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/client/telegram"
 	logger "github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logger/slog"
 	"github.com/danzori-dev/queue-manager/internal/infrastructure/persistence/sqlite"
 	"github.com/danzori-dev/queue-manager/internal/worker/cleaner"
-	"github.com/danzori-dev/queue-manager/internal/worker/renderer"
+	"github.com/danzori-dev/queue-manager/internal/worker/scheduler"
 )
 
 func Run(ctx context.Context) error {
@@ -151,15 +152,15 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	queueMessenger := telegram.NewQueueMessenger(
 		telegram.QueueMessengerDeps{
-			Bot:         bot,
-			BotUsername: me.Username,
-			APITimeout:  cfg.Telegram.APITimeout,
-			Log:         log,
+			Bot:        bot,
+			Renderer:   render.NewMessages(me.Username),
+			APITimeout: cfg.Telegram.APITimeout,
+			Log:        log,
 		},
 	)
 
-	scheduler := renderer.New(
-		renderer.Config{
+	renderScheduler := scheduler.New(
+		scheduler.Config{
 			Debounce:    cfg.Render.Debounce,
 			MinInterval: cfg.Render.MinInterval,
 			RetryDelay:  cfg.Render.RetryDelay,
@@ -174,20 +175,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 			Targets:   targetRepo,
 			Students:  studentSvc,
 			Messages:  queueMessenger,
-			Scheduler: scheduler,
-		},
-	)
-
-	tgHandler := handler.New(
-		handler.Deps{
-			Bot:        bot,
-			Admin:      adminSvc,
-			Students:   studentSvc,
-			Queue:      queueSvc,
-			Swaps:      queueSvc,
-			Version:    version(),
-			APITimeout: cfg.Telegram.APITimeout,
-			Log:        log,
+			Scheduler: renderScheduler,
 		},
 	)
 
@@ -209,8 +197,19 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 		//nolint:contextcheck // ctx comes from each update
 		server.RegisterRoutes(
 			server.RouteParams{
-				Bot:          bot,
-				Handler:      tgHandler,
+				Bot: bot,
+				Handlers: handler.New(
+					handler.Deps{
+						Bot:        bot,
+						APITimeout: cfg.Telegram.APITimeout,
+						Version:    version(),
+						Log:        log,
+						Admins:     adminSvc,
+						Queues:     queueSvc,
+						Students:   studentSvc,
+						Swaps:      queueSvc,
+					},
+				),
 				RoleResolver: adminSvc,
 				Students:     studentSvc,
 				RateLimit: middleware.RateLimitConfig{
@@ -237,7 +236,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	g.Go(
 		func() error {
-			return scheduler.Run(ctx, queueSvc)
+			return renderScheduler.Run(ctx, queueSvc)
 		},
 	)
 

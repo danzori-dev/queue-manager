@@ -3,6 +3,9 @@ package texts
 import (
 	"fmt"
 	"html"
+
+	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
+	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
 const (
@@ -16,8 +19,10 @@ const (
 	SwapSelf = "Нельзя поменяться с самим собой."
 	SwapBusy = "У тебя или у этого человека уже есть активный запрос на обмен."
 
-	ButtonSwapSend   = "Отправить запрос"
-	ButtonSwapCancel = "Отменить запрос"
+	ButtonSwapSend    = "Отправить запрос"
+	ButtonSwapCancel  = "Отменить запрос"
+	ButtonSwapAccept  = "Принять"
+	ButtonSwapDecline = "Отклонить"
 
 	SwapAborted  = "Отменено."
 	SwapNotYours = "Это не твой запрос."
@@ -67,5 +72,15 @@ func SwapFailedForInitiator(title string) string {
 	return fmt.Sprintf(
 		"Обмен в очереди «%s» не выполнен: очередь изменилась. Отправь запрос заново.",
 		html.EscapeString(title),
+	)
+}
+
+func SwapAsk(swap appqueue.Swap) string {
+	return fmt.Sprintf(
+		"%s предлагает поменяться с тобой местами в очереди «%s».\n\n"+
+			"Твое место - %d\nМесто %s - %d\n\n"+
+			"Запрос действует %d минут.",
+		html.EscapeString(swap.FromName), html.EscapeString(swap.Event.Title),
+		swap.ToPos, html.EscapeString(swap.FromName), swap.FromPos, int(domain.SwapTTL.Minutes()),
 	)
 }
