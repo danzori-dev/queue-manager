@@ -16,6 +16,7 @@ type EventRepository interface {
 	ListOpenWithUser(ctx context.Context, userID int64) ([]domain.Event, error)
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
+	SetTitle(ctx context.Context, eventID int64, title string) error
 	Delete(ctx context.Context, eventID int64) error
 	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
 }
@@ -84,6 +85,15 @@ func (c *EventCache) SetStatus(ctx context.Context, eventID int64, status domain
 	delete(c.events, eventID)
 
 	return c.inner.SetStatus(ctx, eventID, status)
+}
+
+func (c *EventCache) SetTitle(ctx context.Context, eventID int64, title string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.events, eventID)
+
+	return c.inner.SetTitle(ctx, eventID, title)
 }
 
 func (c *EventCache) Delete(ctx context.Context, eventID int64) error {

@@ -15,6 +15,7 @@ type EventRepository interface {
 	ListOpenWithUser(ctx context.Context, userID int64) ([]domain.Event, error)
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
+	SetTitle(ctx context.Context, eventID int64, title string) error
 	Delete(ctx context.Context, eventID int64) error
 	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
 }
