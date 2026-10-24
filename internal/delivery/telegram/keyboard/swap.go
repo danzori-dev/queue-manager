@@ -78,7 +78,7 @@ func SwapConfirm(eventID, toID int64) *telego.InlineKeyboardMarkup {
 					EventID: eventID,
 					UserID:  toID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleSuccess),
 			button(
 				texts.ButtonCancel, callback.Action{
 					Kind:    callback.ActionSwapAbort,
@@ -97,7 +97,7 @@ func SwapCancel(requestID int64) *telego.InlineKeyboardMarkup {
 					Kind:    callback.ActionSwapCancel,
 					EventID: requestID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleDanger),
 		),
 	)
 }
@@ -110,13 +110,13 @@ func SwapAnswer(requestID int64) *telego.InlineKeyboardMarkup {
 					Kind:    callback.ActionSwapAccept,
 					EventID: requestID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleSuccess),
 			button(
 				texts.ButtonSwapDecline, callback.Action{
 					Kind:    callback.ActionSwapDecline,
 					EventID: requestID,
 				},
-			),
+			).WithStyle(telego.ButtonStyleDanger),
 		),
 	)
 }
