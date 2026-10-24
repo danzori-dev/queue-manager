@@ -212,9 +212,15 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 				),
 				RoleResolver: adminSvc,
 				Students:     studentSvc,
-				RateLimit: middleware.RateLimitConfig{
-					Burst:    cfg.RateLimit.Burst,
-					Interval: cfg.RateLimit.Interval,
+				RateLimit: server.RateLimit{
+					Student: middleware.RateLimitConfig{
+						Burst:    cfg.RateLimit.Student.Burst,
+						Interval: cfg.RateLimit.Student.Interval,
+					},
+					Admin: middleware.RateLimitConfig{
+						Burst:    cfg.RateLimit.Admin.Burst,
+						Interval: cfg.RateLimit.Admin.Interval,
+					},
 				},
 				APITimeout: cfg.Telegram.APITimeout,
 				Log:        log,

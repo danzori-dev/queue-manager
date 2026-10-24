@@ -20,20 +20,29 @@ type RateLimitConfig struct {
 	Interval time.Duration
 }
 
-func RateLimit(cfg RateLimitConfig, bot *telego.Bot, apiTimeout time.Duration, log *slog.Logger) th.Handler {
+func RateLimit(student, admin RateLimitConfig, bot *telego.Bot, apiTimeout time.Duration, log *slog.Logger) th.Handler {
 	var (
 		mu       sync.Mutex
-		limiters = make(map[int64]*rate.Limiter)
+		limiters = map[access.Role]map[int64]*rate.Limiter{
+			access.RoleStudent: {},
+			access.RoleAdmin:   {},
+		}
 	)
 
-	allow := func(userID int64) bool {
+	allow := func(userID int64, role access.Role) bool {
+		cfg, byUser := student, limiters[access.RoleStudent]
+
+		if role.AtLeast(access.RoleAdmin) {
+			cfg, byUser = admin, limiters[access.RoleAdmin]
+		}
+
 		mu.Lock()
 		defer mu.Unlock()
 
-		limiter, ok := limiters[userID]
+		limiter, ok := byUser[userID]
 		if !ok {
 			limiter = rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst)
-			limiters[userID] = limiter
+			byUser[userID] = limiter
 		}
 
 		return limiter.Allow()
@@ -41,12 +50,13 @@ func RateLimit(cfg RateLimitConfig, bot *telego.Bot, apiTimeout time.Duration, l
 
 	return func(ctx *th.Context, update telego.Update) error {
 		userID := extractUserID(update)
+		role := RoleFromContext(ctx)
 
-		if userID == 0 || update.MyChatMember != nil || RoleFromContext(ctx).AtLeast(access.RoleOwner) {
+		if userID == 0 || update.MyChatMember != nil || role.AtLeast(access.RoleOwner) {
 			return ctx.Next(update)
 		}
 
-		if allow(userID) {
+		if allow(userID, role) {
 			return ctx.Next(update)
 		}
 

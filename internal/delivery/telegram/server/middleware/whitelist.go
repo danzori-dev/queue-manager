@@ -12,17 +12,9 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/domain/access"
 )
 
-type StudentLookup interface {
-	Name(userID int64) (string, bool)
-}
-
-func WhiteList(students StudentLookup, bot *telego.Bot, apiTimeout time.Duration) th.Handler {
+func WhiteList(bot *telego.Bot, apiTimeout time.Duration) th.Handler {
 	return func(ctx *th.Context, update telego.Update) error {
-		if update.MyChatMember != nil || RoleFromContext(ctx).AtLeast(access.RoleAdmin) {
-			return ctx.Next(update)
-		}
-
-		if _, ok := students.Name(extractUserID(update)); ok {
+		if update.MyChatMember != nil || RoleFromContext(ctx).AtLeast(access.RoleStudent) {
 			return ctx.Next(update)
 		}
 

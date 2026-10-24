@@ -38,5 +38,9 @@ cleanup:
     interval: "${CLEANUP_INTERVAL:-24h}"
 
 rate_limit:
-    burst: "${RATE_LIMIT_BURST:-5}"
-    interval: "${RATE_LIMIT_INTERVAL:-3s}"
+    student:
+        burst: "${RATE_LIMIT_STUDENT_BURST:-3}"
+        interval: "${RATE_LIMIT_STUDENT_INTERVAL:-3s}"
+    admin:
+        burst: "${RATE_LIMIT_ADMIN_BURST:-5}"
+        interval: "${RATE_LIMIT_ADMIN_INTERVAL:-3s}"

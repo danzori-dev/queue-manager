@@ -18,9 +18,14 @@ type RouteParams struct {
 	Handlers     handler.Handlers
 	RoleResolver middleware.RoleResolver
 	Students     middleware.StudentLookup
-	RateLimit    middleware.RateLimitConfig
+	RateLimit    RateLimit
 	APITimeout   time.Duration
 	Log          *slog.Logger
+}
+
+type RateLimit struct {
+	Student middleware.RateLimitConfig
+	Admin   middleware.RateLimitConfig
 }
 
 func RegisterRoutes(p RouteParams) Register {
@@ -28,9 +33,9 @@ func RegisterRoutes(p RouteParams) Register {
 		bh.Use(
 			middleware.Logging(p.Log),
 			middleware.Recover(p.Bot, p.APITimeout, p.Log),
-			middleware.Roles(p.RoleResolver),
-			middleware.WhiteList(p.Students, p.Bot, p.APITimeout),
-			middleware.RateLimit(p.RateLimit, p.Bot, p.APITimeout, p.Log),
+			middleware.Roles(p.RoleResolver, p.Students),
+			middleware.WhiteList(p.Bot, p.APITimeout),
+			middleware.RateLimit(p.RateLimit.Student, p.RateLimit.Admin, p.Bot, p.APITimeout, p.Log),
 		)
 
 		private := bh.Group(privateChat)

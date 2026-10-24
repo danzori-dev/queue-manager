@@ -4,6 +4,7 @@ type Role uint8
 
 const (
 	RoleOutsider Role = iota
+	RoleStudent
 	RoleAdmin
 	RoleOwner
 )

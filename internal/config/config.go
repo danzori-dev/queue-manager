@@ -68,6 +68,11 @@ type Cleanup struct {
 }
 
 type RateLimit struct {
+	Student RateLimitSettings `yaml:"student"`
+	Admin   RateLimitSettings `yaml:"admin"`
+}
+
+type RateLimitSettings struct {
 	Burst    int           `validate:"required,gte=1" yaml:"burst"`
 	Interval time.Duration `validate:"required,gt=0"  yaml:"interval"`
 }

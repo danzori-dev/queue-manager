@@ -15,14 +15,25 @@ type RoleResolver interface {
 	RoleOf(userID int64) access.Role
 }
 
-func Roles(resolver RoleResolver) th.Handler {
+type StudentLookup interface {
+	Name(userID int64) (string, bool)
+}
+
+func Roles(resolver RoleResolver, students StudentLookup) th.Handler {
 	return func(ctx *th.Context, update telego.Update) error {
 		userID := extractUserID(update)
 		if userID == 0 {
 			return ctx.Next(update)
 		}
 
-		stdCtx := context.WithValue(ctx, roleCtxKey{}, resolver.RoleOf(userID))
+		role := resolver.RoleOf(userID)
+		if role == access.RoleOutsider {
+			if _, ok := students.Name(userID); ok {
+				role = access.RoleStudent
+			}
+		}
+
+		stdCtx := context.WithValue(ctx, roleCtxKey{}, role)
 
 		return ctx.WithContext(stdCtx).Next(update)
 	}
