@@ -59,15 +59,8 @@ func QueueMessage(view appqueue.View) string {
 		return b.String()
 	}
 
-	for _, line := range view.Lines {
-		fmt.Fprintf(&b, "\n%d. %s", line.Position, html.EscapeString(line.Name))
-
-		if line.UserName != "" {
-			fmt.Fprintf(&b, " (@%s)", line.UserName)
-		}
-	}
-
-	fmt.Fprintf(&b, "\n\nВ очереди: %d", len(view.Lines))
+	places := groupPlaces(view.Lines)
+	writePlaces(&b, places)
 
 	return b.String()
 }
@@ -83,4 +76,35 @@ func Removal(r appqueue.Removal) string {
 		`%s убрал <a href="tg://user?id=%d">%s</a> из очереди «%s».`,
 		actor, r.UserID, html.EscapeString(r.UserName), html.EscapeString(r.Event.Title),
 	)
+}
+
+func groupPlaces(lines []appqueue.Line) [][]appqueue.Line {
+	var places [][]appqueue.Line
+
+	for i, line := range lines {
+		if i == 0 || line.Position != lines[i-1].Position {
+			places = append(places, nil)
+		}
+
+		places[len(places)-1] = append(places[len(places)-1], line)
+	}
+
+	return places
+}
+
+func writePlaces(b *strings.Builder, places [][]appqueue.Line) {
+	for _, place := range places {
+		people := make([]string, 0, len(place))
+
+		for _, line := range place {
+			person := html.EscapeString(line.Name)
+			if line.UserName != "" {
+				person += fmt.Sprintf(" (@%s)", line.UserName)
+			}
+
+			people = append(people, person)
+		}
+
+		fmt.Fprintf(b, "\n%d. %s", place[0].Position, strings.Join(people, ", "))
+	}
 }

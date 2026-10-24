@@ -57,13 +57,7 @@ func EventMenu(view appqueue.View) string {
 		return b.String()
 	}
 
-	for _, line := range view.Lines {
-		fmt.Fprintf(&b, "\n%d. %s", line.Position, html.EscapeString(line.Name))
-
-		if line.UserName != "" {
-			fmt.Fprintf(&b, " (@%s)", line.UserName)
-		}
-	}
+	writePlaces(&b, groupPlaces(view.Lines))
 
 	return b.String()
 }
