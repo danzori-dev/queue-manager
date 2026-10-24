@@ -43,40 +43,9 @@ type Messenger interface {
 	Edit(ctx context.Context, view View) (time.Duration, error)
 	Delete(ctx context.Context, event domain.Event)
 	AnnounceRemoval(ctx context.Context, removal Removal)
-	AskSwap(ctx context.Context, ask SwapAsk) (int, error)
+	AskSwap(ctx context.Context, swap Swap) (int, error)
 }
 
 type RenderScheduler interface {
 	Schedule(eventID int64)
-}
-
-type View struct {
-	Event domain.Event
-	Lines []Line
-}
-
-type Line struct {
-	Position int
-	UserID   int64
-	Name     string
-	UserName string
-}
-
-type CarryPlan struct {
-	From  domain.Event
-	To    domain.Event
-	Lines []Line
-}
-
-type Removal struct {
-	Event     domain.Event
-	ActorName string
-	UserID    int64
-	UserName  string
-}
-
-type SwapAsk struct {
-	Request  domain.SwapRequest
-	FromName string
-	ToName   string
 }
