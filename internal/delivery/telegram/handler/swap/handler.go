@@ -91,8 +91,14 @@ func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, a
 	case callback.ActionSwapAbort:
 		return "", h.reply.EditMenu(ctx, query, texts.SwapAborted, keyboard.None())
 
-	case callback.ActionSwapAccept, callback.ActionSwapDecline, callback.ActionSwapCancel:
-		return h.resolve(ctx, query, a)
+	case callback.ActionSwapAccept:
+		return h.accept(ctx, query, a.EventID)
+
+	case callback.ActionSwapDecline:
+		return h.decline(ctx, query, a.EventID)
+
+	case callback.ActionSwapCancel:
+		return h.cancel(ctx, query, a.EventID)
 
 	default:
 		return "", callback.ErrUnknownAction
@@ -142,34 +148,6 @@ func (h *Handler) send(ctx context.Context, query telego.CallbackQuery, eventID,
 	return h.reply.EditMenu(ctx, query, texts.SwapSent(req.ToName), keyboard.SwapCancel(req.ID))
 }
 
-func (h *Handler) resolve(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
-	switch a.Kind {
-	case callback.ActionSwapAccept:
-		return h.accept(ctx, query, a.EventID)
-
-	case callback.ActionSwapDecline:
-		req, err := h.swaps.DeclineSwap(ctx, a.EventID, query.From.ID)
-		if err != nil {
-			return h.gone(ctx, query, err)
-		}
-
-		h.reply.Notify(ctx, req.FromID, texts.SwapDeclinedForInitiator(req.ToName, req.Event.Title))
-		h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
-
-		return "", h.reply.EditMenu(ctx, query, texts.SwapDeclined, keyboard.None())
-
-	default:
-		req, err := h.swaps.CancelSwap(ctx, a.EventID, query.From.ID)
-		if err != nil {
-			return h.gone(ctx, query, err)
-		}
-
-		h.reply.DeleteMessage(ctx, req.ToID, req.ToMessageID)
-
-		return "", h.reply.EditMenu(ctx, query, texts.SwapCanceled, keyboard.None())
-	}
-}
-
 func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
 	req, err := h.swaps.AcceptSwap(ctx, requestID, query.From.ID)
 
@@ -190,6 +168,29 @@ func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, reques
 	h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
 
 	return "", h.reply.EditMenu(ctx, query, texts.SwapAcceptedForAddressee(req.FromPos), keyboard.None())
+}
+
+func (h *Handler) decline(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
+	req, err := h.swaps.DeclineSwap(ctx, requestID, query.From.ID)
+	if err != nil {
+		return h.gone(ctx, query, err)
+	}
+
+	h.reply.Notify(ctx, req.FromID, texts.SwapDeclinedForInitiator(req.ToName, req.Event.Title))
+	h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
+
+	return "", h.reply.EditMenu(ctx, query, texts.SwapDeclined, keyboard.None())
+}
+
+func (h *Handler) cancel(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
+	req, err := h.swaps.CancelSwap(ctx, requestID, query.From.ID)
+	if err != nil {
+		return h.gone(ctx, query, err)
+	}
+
+	h.reply.DeleteMessage(ctx, req.ToID, req.ToMessageID)
+
+	return "", h.reply.EditMenu(ctx, query, texts.SwapCanceled, keyboard.None())
 }
 
 func (h *Handler) gone(ctx context.Context, query telego.CallbackQuery, err error) (string, error) {
