@@ -22,6 +22,7 @@ profile.cov
 
 # Personal data
 students.json
+students.test.json
 
 docs/
 
