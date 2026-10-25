@@ -39,22 +39,22 @@ func (t *requestThrottle) check(fromID, toID int64) error {
 	defer t.mu.Unlock()
 
 	now := time.Now()
-	since := now.Add(-t.limit.Window)
+	recent := t.recent(fromID, now)
 
-	recent := 0
+	if len(recent) >= t.limit.MaxFailures {
+		freed := recent[len(recent)-t.limit.MaxFailures].Add(t.limit.Window)
 
-	for _, at := range t.failures[fromID] {
-		if at.After(since) {
-			recent++
+		return &domain.RetryError{
+			Err:   domain.ErrRequestsTooOften,
+			After: freed.Sub(now),
 		}
 	}
 
-	if recent >= t.limit.MaxFailures {
-		return domain.ErrRequestsTooOften
-	}
-
-	if now.Before(t.pauses[requestPair{fromID: fromID, toID: toID}]) {
-		return domain.ErrRequestCooldown
+	if until := t.pauses[requestPair{fromID: fromID, toID: toID}]; now.Before(until) {
+		return &domain.RetryError{
+			Err:   domain.ErrRequestCooldown,
+			After: until.Sub(now),
+		}
 	}
 
 	return nil
@@ -95,4 +95,20 @@ func (t *requestThrottle) prune(now time.Time) {
 			delete(t.pauses, pair)
 		}
 	}
+}
+
+func (t *requestThrottle) recent(fromID int64, now time.Time) []time.Time {
+	since := now.Add(-t.limit.Window)
+	failures := t.failures[fromID]
+
+	first := slices.IndexFunc(
+		failures, func(at time.Time) bool {
+			return at.After(since)
+		},
+	)
+	if first < 0 {
+		return nil
+	}
+
+	return failures[first:]
 }
