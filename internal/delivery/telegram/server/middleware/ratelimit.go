@@ -60,7 +60,7 @@ func RateLimit(student, admin RateLimitConfig, bot *telego.Bot, apiTimeout time.
 			return ctx.Next(update)
 		}
 
-		log.DebugContext(ctx, "rate limited")
+		log.InfoContext(ctx, "rate limited")
 
 		if update.CallbackQuery != nil {
 			reqCtx, cancel := context.WithTimeout(ctx, apiTimeout)
