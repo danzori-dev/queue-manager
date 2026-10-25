@@ -68,7 +68,7 @@ func (h *Handler) Start(ctx context.Context, msg telego.Message, eventID int64) 
 		return h.reply.SendHTML(ctx, msg, text)
 	}
 
-	if len(view.Lines) < 2 {
+	if !hasOtherPlaces(view, msg.From.ID) {
 		return h.reply.SendHTML(ctx, msg, texts.SwapNobody)
 	}
 
@@ -105,7 +105,7 @@ func (h *Handler) showCandidates(ctx context.Context, query telego.CallbackQuery
 		return h.stepFailed(ctx, query, err)
 	}
 
-	if len(view.Lines) < 2 {
+	if !hasOtherPlaces(view, query.From.ID) {
 		return h.reply.EditMenu(ctx, query, texts.SwapNobody, keyboard.None())
 	}
 
@@ -231,12 +231,25 @@ func errorText(err error) (string, bool) {
 	case errors.Is(err, domain.ErrSwapSelf):
 		return texts.SwapSelf, true
 
+	case errors.Is(err, domain.ErrSwapSamePlace):
+		return texts.SwapSamePlace, true
+
 	case errors.Is(err, domain.ErrSwapBusy):
 		return texts.SwapBusy, true
 
 	default:
 		return "", false
 	}
+}
+
+func hasOtherPlaces(view appqueue.View, userID int64) bool {
+	me, ok := findLine(view, userID)
+
+	return ok && slices.ContainsFunc(
+		view.Lines, func(l appqueue.Line) bool {
+			return l.Position != me.Position
+		},
+	)
 }
 
 func findLine(view appqueue.View, userID int64) (appqueue.Line, bool) {

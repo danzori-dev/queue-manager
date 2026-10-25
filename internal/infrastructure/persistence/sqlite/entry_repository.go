@@ -311,6 +311,89 @@ func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, user
 	return nil
 }
 
+func (r *EntryRepository) JoinPlace(ctx context.Context, eventID, userID int64, username string, partnerID int64) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		keyQuery = `
+			SELECT sort_key
+			FROM queue_entries
+			WHERE event_id = ? AND user_id = ?
+		`
+
+		sizeQuery = `
+			SELECT count(*)
+			FROM queue_entries
+			WHERE event_id = ? AND sort_key = ?
+		`
+
+		upsertQuery = `
+			INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT (event_id, user_id) DO UPDATE 
+			    SET sort_key = excluded.sort_key,
+			        username = excluded.username
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var key int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, partnerID).
+		Scan(&key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query partner entry: %w", err)
+	}
+
+	var current int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, userID).
+		Scan(&current)
+
+	switch {
+	case err == nil && current == key:
+		return domain.ErrAlreadyOnPlace
+
+	case err != nil && !errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("query entry: %w", err)
+	}
+
+	var size int
+
+	if err := tx.QueryRowContext(ctx, sizeQuery, eventID, key).Scan(&size); err != nil {
+		return fmt.Errorf("query place size: %w", err)
+	}
+
+	if size >= domain.MaxPlaceSize {
+		return domain.ErrPlaceFull
+	}
+
+	if _, err := tx.ExecContext(ctx, upsertQuery, eventID, userID, username, key); err != nil {
+		return fmt.Errorf("upsert entry: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}
+
 func swapPlaces(ctx context.Context, tx *sql.Tx, eventID, keyA, keyB int64) error {
 	const query = `
 		UPDATE queue_entries

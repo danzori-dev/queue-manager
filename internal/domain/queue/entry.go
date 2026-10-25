@@ -1,5 +1,7 @@
 package queue
 
+const MaxPlaceSize = 5
+
 type Entry struct {
 	UserID   int64
 	Username string

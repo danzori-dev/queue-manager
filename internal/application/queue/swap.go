@@ -57,6 +57,10 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		return Swap{}, err
 	}
 
+	if fromPos == toPos {
+		return Swap{}, domain.ErrSwapSamePlace
+	}
+
 	req, err := s.swaps.add(
 		domain.SwapRequest{
 			Event:         event,
