@@ -57,3 +57,7 @@ func WithThreadID(ctx context.Context, threadID int) context.Context {
 func WithUserID(ctx context.Context, userID int64) context.Context {
 	return With(ctx, slog.Int64("user_id", userID))
 }
+
+func WithUserName(ctx context.Context, name string) context.Context {
+	return With(ctx, slog.String("user_name", name))
+}

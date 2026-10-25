@@ -31,7 +31,7 @@ type RateLimit struct {
 func RegisterRoutes(p RouteParams) Register {
 	return func(bh *th.BotHandler) {
 		bh.Use(
-			middleware.Logging(p.Log),
+			middleware.Logging(p.Log, p.Students),
 			middleware.Recover(p.Bot, p.APITimeout, p.Log),
 			middleware.Roles(p.RoleResolver, p.Students),
 			middleware.WhiteList(p.Bot, p.APITimeout),
