@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -61,6 +62,12 @@ func (s *Service) CreateEvent(ctx context.Context, title string) error {
 		return fmt.Errorf("save message id: %w", err)
 	}
 
+	s.audit(
+		ctx, "event created",
+		slog.Int64("event_id", event.ID),
+		slog.String("title", event.Title),
+	)
+
 	return nil
 }
 
@@ -84,6 +91,11 @@ func (s *Service) RenameEvent(ctx context.Context, eventID int64, title string) 
 	}
 
 	s.scheduler.Schedule(eventID)
+	s.audit(
+		ctx, "event renamed",
+		slog.Int64("event_id", eventID),
+		slog.String("title", title),
+	)
 
 	return nil
 }
@@ -134,6 +146,11 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID int64) error {
 	}
 
 	s.messages.Delete(ctx, event)
+	s.audit(
+		ctx, "event deleted",
+		slog.Int64("event_id", eventID),
+		slog.String("title", event.Title),
+	)
 
 	return nil
 }
@@ -153,6 +170,15 @@ func (s *Service) setStatus(ctx context.Context, eventID int64, status domain.St
 	}
 
 	s.scheduler.Schedule(eventID)
+	s.audit(ctx, statusAction(status), slog.Int64("event_id", eventID))
 
 	return nil
+}
+
+func statusAction(status domain.Status) string {
+	if status == domain.StatusClosed {
+		return "event closed"
+	}
+
+	return "event reopened"
 }

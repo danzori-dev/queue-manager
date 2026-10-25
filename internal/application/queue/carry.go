@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -32,6 +33,12 @@ func (s *Service) Carry(ctx context.Context, fromID int64, fromPos int, toID int
 	}
 
 	s.scheduler.Schedule(c.to.ID)
+	s.audit(
+		ctx, "queue carried over",
+		slog.Int64("from_event_id", c.from.ID),
+		slog.Int64("to_event_id", c.to.ID),
+		slog.Int("count", len(c.entries)),
+	)
 
 	return len(c.entries), nil
 }

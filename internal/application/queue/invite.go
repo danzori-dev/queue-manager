@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -112,6 +113,13 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 	s.invites.setMessage(req.ID, messageID)
 	invite.ToMessageID = messageID
 
+	s.audit(
+		ctx, "invite sent",
+		slog.Int64("event_id", invite.Event.ID),
+		slog.Int64("peer_user_id", invite.ToID),
+		slog.String("peer_name", invite.ToName),
+	)
+
 	return invite, nil
 }
 
@@ -149,10 +157,18 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 
 	invite.Position = pos
 
+	s.audit(
+		ctx, "invite accepted",
+		slog.Int64("event_id", invite.Event.ID),
+		slog.Int64("peer_user_id", invite.FromID),
+		slog.String("peer_name", invite.FromName),
+		slog.Int("position", pos),
+	)
+
 	return invite, nil
 }
 
-func (s *Service) DeclineInvite(_ context.Context, requestID, userID int64) (Invite, error) {
+func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
 	req, err := s.invites.take(requestID, userID, addressee)
 	if err != nil {
 		return Invite{}, err
@@ -160,10 +176,18 @@ func (s *Service) DeclineInvite(_ context.Context, requestID, userID int64) (Inv
 
 	s.throttle.fail(req.FromID, req.ToID)
 
-	return s.namedInvite(req), nil
+	invite := s.namedInvite(req)
+	s.audit(
+		ctx, "invite declined",
+		slog.Int64("event_id", invite.Event.ID),
+		slog.Int64("peer_user_id", invite.FromID),
+		slog.String("peer_name", invite.FromName),
+	)
+
+	return invite, nil
 }
 
-func (s *Service) CancelInvite(_ context.Context, requestID, userID int64) (Invite, error) {
+func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
 	req, err := s.invites.take(requestID, userID, initiator)
 	if err != nil {
 		return Invite{}, err
@@ -171,7 +195,15 @@ func (s *Service) CancelInvite(_ context.Context, requestID, userID int64) (Invi
 
 	s.throttle.fail(req.FromID, req.ToID)
 
-	return s.namedInvite(req), nil
+	invite := s.namedInvite(req)
+	s.audit(
+		ctx, "invite canceled",
+		slog.Int64("event_id", invite.Event.ID),
+		slog.Int64("peer_user_id", invite.ToID),
+		slog.String("peer_name", invite.ToName),
+	)
+
+	return invite, nil
 }
 
 func (s *Service) placeOfUser(ctx context.Context, eventID, userID int64) ([]domain.Entry, int, error) {
