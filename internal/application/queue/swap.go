@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -92,6 +93,13 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 	s.swaps.setMessage(req.ID, messageID)
 	swap.ToMessageID = messageID
 
+	s.audit(
+		ctx, "swap requested",
+		slog.Int64("event_id", swap.Event.ID),
+		slog.Int64("peer_user_id", swap.ToID),
+		slog.String("peer_name", swap.ToName),
+	)
+
 	return swap, nil
 }
 
@@ -129,11 +137,17 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 	}
 
 	s.scheduler.Schedule(req.Event.ID)
+	s.audit(
+		ctx, "swap accepted",
+		slog.Int64("event_id", swap.Event.ID),
+		slog.Int64("peer_user_id", swap.FromID),
+		slog.String("peer_name", swap.FromName),
+	)
 
 	return swap, nil
 }
 
-func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap, error) {
+func (s *Service) DeclineSwap(ctx context.Context, requestID, userID int64) (Swap, error) {
 	req, err := s.swaps.take(requestID, userID, addressee)
 	if err != nil {
 		return Swap{}, err
@@ -141,10 +155,18 @@ func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap,
 
 	s.throttle.fail(req.FromID, req.ToID)
 
-	return s.named(req), nil
+	swap := s.named(req)
+	s.audit(
+		ctx, "swap declined",
+		slog.Int64("event_id", swap.Event.ID),
+		slog.Int64("peer_user_id", swap.FromID),
+		slog.String("peer_name", swap.FromName),
+	)
+
+	return swap, nil
 }
 
-func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, error) {
+func (s *Service) CancelSwap(ctx context.Context, requestID, userID int64) (Swap, error) {
 	req, err := s.swaps.take(requestID, userID, initiator)
 	if err != nil {
 		return Swap{}, err
@@ -152,7 +174,15 @@ func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, 
 
 	s.throttle.fail(req.FromID, req.ToID)
 
-	return s.named(req), nil
+	swap := s.named(req)
+	s.audit(
+		ctx, "swap canceled",
+		slog.Int64("event_id", swap.Event.ID),
+		slog.Int64("peer_user_id", swap.ToID),
+		slog.String("peer_name", swap.ToName),
+	)
+
+	return swap, nil
 }
 
 func (s *Service) positions(ctx context.Context, eventID, userA, userB int64) (posA, posB int, err error) {
