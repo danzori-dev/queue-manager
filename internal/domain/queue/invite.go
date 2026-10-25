@@ -10,6 +10,7 @@ type InviteRequest struct {
 	FromID        int64
 	ToID          int64
 	Position      int
+	ToPosition    int
 	FromMessageID int
 	ToMessageID   int
 	CreatedAt     time.Time

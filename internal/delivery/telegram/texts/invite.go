@@ -55,12 +55,19 @@ func InviteSent(name string) string {
 }
 
 func InviteAsk(invite appqueue.Invite) string {
+	afterAccept := "Если согласишься, вы будете стоять на одном месте."
+
+	if invite.ToPosition != 0 {
+		afterAccept = fmt.Sprintf(
+			"Сейчас ты на %d-м месте. Если согласишься, перейдёшь на %d-е.",
+			invite.ToPosition, invite.Position,
+		)
+	}
+
 	return fmt.Sprintf(
-		"%s приглашает тебя к себе на %d-е место в очереди «%s».\n\n"+
-			"Если согласишься, вы будете стоять на одном месте.\n"+
-			"Приглашение действует %d минут.",
+		"%s приглашает тебя к себе на %d-е место в очереди «%s».\n\n%s\nПриглашение действует %d минут.",
 		html.EscapeString(invite.FromName), invite.Position, html.EscapeString(invite.Event.Title),
-		int(domain.InviteTTL.Minutes()),
+		afterAccept, int(domain.InviteTTL.Minutes()),
 	)
 }
 

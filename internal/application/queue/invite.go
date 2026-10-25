@@ -62,20 +62,22 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 		return Invite{}, err
 	}
 
-	place, pos, err := s.placeOfUser(ctx, eventID, fromID)
+	places, err := s.places(ctx, eventID)
 	if err != nil {
 		return Invite{}, err
 	}
 
-	if slices.ContainsFunc(
-		place, func(e domain.Entry) bool {
-			return e.UserID == toID
-		},
-	) {
+	pos := domain.PlaceOf(places, fromID)
+	if pos == 0 {
+		return Invite{}, domain.ErrNotInQueue
+	}
+
+	toPos := domain.PlaceOf(places, toID)
+	if toPos == pos {
 		return Invite{}, domain.ErrAlreadyOnPlace
 	}
 
-	if len(place) >= domain.MaxPlaceSize {
+	if len(places[pos-1]) >= domain.MaxPlaceSize {
 		return Invite{}, domain.ErrPlaceFull
 	}
 
@@ -85,6 +87,7 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 			FromID:        fromID,
 			ToID:          toID,
 			Position:      pos,
+			ToPosition:    toPos,
 			FromMessageID: fromMessageID,
 			CreatedAt:     time.Now(),
 		},
@@ -164,12 +167,10 @@ func (s *Service) CancelInvite(_ context.Context, requestID, userID int64) (Invi
 }
 
 func (s *Service) placeOfUser(ctx context.Context, eventID, userID int64) ([]domain.Entry, int, error) {
-	entries, err := s.entries.List(ctx, eventID)
+	places, err := s.places(ctx, eventID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list entries: %w", err)
+		return nil, 0, err
 	}
-
-	places := domain.Places(entries)
 
 	pos := domain.PlaceOf(places, userID)
 	if pos == 0 {
@@ -177,6 +178,15 @@ func (s *Service) placeOfUser(ctx context.Context, eventID, userID int64) ([]dom
 	}
 
 	return places[pos-1], pos, nil
+}
+
+func (s *Service) places(ctx context.Context, eventID int64) ([][]domain.Entry, error) {
+	entries, err := s.entries.List(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list entries: %w", err)
+	}
+
+	return domain.Places(entries), nil
 }
 
 func (s *Service) namedInvite(req domain.InviteRequest) Invite {
