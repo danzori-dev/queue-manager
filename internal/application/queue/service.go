@@ -8,12 +8,13 @@ import (
 )
 
 type Deps struct {
-	Events    EventRepository
-	Entries   EntryRepository
-	Targets   TargetRepository
-	Students  StudentDirectory
-	Messages  Messenger
-	Scheduler RenderScheduler
+	Events       EventRepository
+	Entries      EntryRepository
+	Targets      TargetRepository
+	Students     StudentDirectory
+	Messages     Messenger
+	Scheduler    RenderScheduler
+	RequestLimit RequestLimit
 }
 
 type Service struct {
@@ -25,6 +26,7 @@ type Service struct {
 	scheduler RenderScheduler
 	swaps     *swapStore
 	invites   *inviteStore
+	throttle  *requestThrottle
 }
 
 func New(d Deps) *Service {
@@ -37,6 +39,7 @@ func New(d Deps) *Service {
 		scheduler: d.Scheduler,
 		swaps:     newSwapStore(),
 		invites:   newInviteStore(),
+		throttle:  newRequestThrottle(d.RequestLimit),
 	}
 }
 

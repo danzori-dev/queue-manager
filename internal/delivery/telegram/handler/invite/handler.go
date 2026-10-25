@@ -251,6 +251,12 @@ func errorText(err error) (string, bool) {
 	case errors.Is(err, domain.ErrInviteBusy):
 		return texts.InviteBusy, true
 
+	case errors.Is(err, domain.ErrRequestsTooOften):
+		return texts.RequestsTooOften, true
+
+	case errors.Is(err, domain.ErrRequestCooldown):
+		return texts.RequestCooldown, true
+
 	default:
 		return "", false
 	}
