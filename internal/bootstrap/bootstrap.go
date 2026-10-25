@@ -181,6 +181,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 				MaxFailures: cfg.RequestLimit.MaxFailures,
 				Pause:       cfg.RequestLimit.Pause,
 			},
+			Log: log,
 		},
 	)
 

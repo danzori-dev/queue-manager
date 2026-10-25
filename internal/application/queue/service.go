@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -15,6 +16,7 @@ type Deps struct {
 	Messages     Messenger
 	Scheduler    RenderScheduler
 	RequestLimit RequestLimit
+	Log          *slog.Logger
 }
 
 type Service struct {
@@ -27,6 +29,7 @@ type Service struct {
 	swaps     *swapStore
 	invites   *inviteStore
 	throttle  *requestThrottle
+	log       *slog.Logger
 }
 
 func New(d Deps) *Service {
@@ -40,6 +43,7 @@ func New(d Deps) *Service {
 		swaps:     newSwapStore(),
 		invites:   newInviteStore(),
 		throttle:  newRequestThrottle(d.RequestLimit),
+		log:       d.Log,
 	}
 }
 
@@ -93,4 +97,8 @@ func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
 	}
 
 	return lines
+}
+
+func (s *Service) audit(ctx context.Context, action string, attrs ...slog.Attr) {
+	s.log.LogAttrs(ctx, slog.LevelInfo, action, append([]slog.Attr{slog.Bool("audit", true)}, attrs...)...)
 }
