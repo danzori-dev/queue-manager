@@ -58,6 +58,6 @@ func WithUserID(ctx context.Context, userID int64) context.Context {
 	return With(ctx, slog.Int64("user_id", userID))
 }
 
-func WithEventID(ctx context.Context, eventID int64) context.Context {
-	return With(ctx, slog.Int64("event_id", eventID))
+func WithUserName(ctx context.Context, name string) context.Context {
+	return With(ctx, slog.String("user_name", name))
 }

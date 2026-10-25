@@ -15,10 +15,10 @@ import (
 
 const slowUpdate = 2 * time.Second
 
-func Logging(log *slog.Logger) th.Handler {
+func Logging(log *slog.Logger, students StudentLookup) th.Handler {
 	return func(ctx *th.Context, update telego.Update) error {
 		start := time.Now()
-		stdCtx := injectContext(ctx.Context(), update)
+		stdCtx := injectContext(ctx.Context(), update, students)
 		ctx = ctx.WithContext(stdCtx)
 
 		err := ctx.Next(update)
@@ -49,7 +49,7 @@ func Logging(log *slog.Logger) th.Handler {
 	}
 }
 
-func injectContext(ctx context.Context, update telego.Update) context.Context {
+func injectContext(ctx context.Context, update telego.Update, students StudentLookup) context.Context {
 	ctx = logctx.WithUpdateID(ctx, update.UpdateID)
 
 	switch {
@@ -86,6 +86,10 @@ func injectContext(ctx context.Context, update telego.Update) context.Context {
 
 	default:
 		ctx = logctx.WithKind(ctx, "other")
+	}
+
+	if name, ok := students.Name(extractUserID(update)); ok {
+		ctx = logctx.WithUserName(ctx, name)
 	}
 
 	return ctx
