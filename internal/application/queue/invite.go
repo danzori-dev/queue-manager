@@ -81,6 +81,10 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 		return Invite{}, domain.ErrPlaceFull
 	}
 
+	if err := s.throttle.check(fromID, toID); err != nil {
+		return Invite{}, err
+	}
+
 	req, err := s.invites.add(
 		domain.InviteRequest{
 			Event:         event,
@@ -154,6 +158,8 @@ func (s *Service) DeclineInvite(_ context.Context, requestID, userID int64) (Inv
 		return Invite{}, err
 	}
 
+	s.throttle.fail(req.FromID, req.ToID)
+
 	return s.namedInvite(req), nil
 }
 
@@ -162,6 +168,8 @@ func (s *Service) CancelInvite(_ context.Context, requestID, userID int64) (Invi
 	if err != nil {
 		return Invite{}, err
 	}
+
+	s.throttle.fail(req.FromID, req.ToID)
 
 	return s.namedInvite(req), nil
 }

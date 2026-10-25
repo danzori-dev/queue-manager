@@ -31,4 +31,6 @@ var (
 	ErrInviteExpired     = errors.New("invite expired")
 	ErrInviteChanged     = errors.New("invite left the queue")
 	ErrInviteForbidden   = errors.New("invite belongs to another user")
+	ErrRequestsTooOften  = errors.New("too many failed requests")
+	ErrRequestCooldown   = errors.New("request to this user is paused")
 )

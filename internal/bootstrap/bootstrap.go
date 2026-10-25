@@ -176,6 +176,11 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 			Students:  studentSvc,
 			Messages:  queueMessenger,
 			Scheduler: renderScheduler,
+			RequestLimit: queue.RequestLimit{
+				Window:      cfg.RequestLimit.Window,
+				MaxFailures: cfg.RequestLimit.MaxFailures,
+				Pause:       cfg.RequestLimit.Pause,
+			},
 		},
 	)
 

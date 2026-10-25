@@ -61,6 +61,10 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		return Swap{}, domain.ErrSwapSamePlace
 	}
 
+	if err := s.throttle.check(fromID, toID); err != nil {
+		return Swap{}, err
+	}
+
 	req, err := s.swaps.add(
 		domain.SwapRequest{
 			Event:         event,
@@ -135,6 +139,8 @@ func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap,
 		return Swap{}, err
 	}
 
+	s.throttle.fail(req.FromID, req.ToID)
+
 	return s.named(req), nil
 }
 
@@ -143,6 +149,8 @@ func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, 
 	if err != nil {
 		return Swap{}, err
 	}
+
+	s.throttle.fail(req.FromID, req.ToID)
 
 	return s.named(req), nil
 }

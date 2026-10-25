@@ -6,12 +6,13 @@ import (
 )
 
 type Config struct {
-	Telegram  Telegram  `yaml:"telegram"`
-	SQLite    SQLite    `yaml:"sqlite"`
-	Render    Render    `yaml:"render"`
-	Log       Log       `yaml:"log"`
-	Cleanup   Cleanup   `yaml:"cleanup"`
-	RateLimit RateLimit `yaml:"rate_limit"`
+	Telegram     Telegram     `yaml:"telegram"`
+	SQLite       SQLite       `yaml:"sqlite"`
+	Render       Render       `yaml:"render"`
+	Log          Log          `yaml:"log"`
+	Cleanup      Cleanup      `yaml:"cleanup"`
+	RateLimit    RateLimit    `yaml:"rate_limit"`
+	RequestLimit RequestLimit `yaml:"request_limit"`
 }
 
 type Telegram struct {
@@ -75,4 +76,10 @@ type RateLimit struct {
 type RateLimitSettings struct {
 	Burst    int           `validate:"required,gte=1" yaml:"burst"`
 	Interval time.Duration `validate:"required,gt=0"  yaml:"interval"`
+}
+
+type RequestLimit struct {
+	Window      time.Duration `validate:"required,gt=0"  yaml:"window"`
+	MaxFailures int           `validate:"required,gte=1" yaml:"max_failures"`
+	Pause       time.Duration `validate:"required,gt=0"  yaml:"pause"`
 }

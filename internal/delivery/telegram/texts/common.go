@@ -1,6 +1,10 @@
 package texts
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"time"
+)
 
 const (
 	InternalError     = "Что-то пошло не так, попробуй ещё раз."
@@ -15,6 +19,18 @@ const (
 	ButtonPrevPage = "←"
 	ButtonNextPage = "→"
 )
+
+func RequestsTooOften(wait time.Duration) string {
+	return fmt.Sprintf("Слишком много запросов за последнее время. Попробуй снова через %s.", waitText(wait))
+}
+
+func RequestCooldown(wait time.Duration) string {
+	return fmt.Sprintf("Этому человеку недавно уже был запрос от тебя. Попробуй снова через %s.", waitText(wait))
+}
+
+func waitText(wait time.Duration) string {
+	return fmt.Sprintf("%d мин", int(math.Ceil(wait.Minutes())))
+}
 
 func pageLine(index, count int) string {
 	if count <= 1 {
