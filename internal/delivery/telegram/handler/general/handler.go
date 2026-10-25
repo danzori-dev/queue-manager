@@ -18,7 +18,8 @@ import (
 type Deps struct {
 	Replier *reply.Replier
 	Queues  QueueService
-	Swaps   SwapStarter
+	Swaps   Starter
+	Invites Starter
 	Version string
 	Log     *slog.Logger
 }
@@ -26,7 +27,8 @@ type Deps struct {
 type Handler struct {
 	reply   *reply.Replier
 	queues  QueueService
-	swaps   SwapStarter
+	swaps   Starter
+	invites Starter
 	version string
 	log     *slog.Logger
 }
@@ -36,6 +38,7 @@ func New(d Deps) *Handler {
 		reply:   d.Replier,
 		queues:  d.Queues,
 		swaps:   d.Swaps,
+		invites: d.Invites,
 		version: d.Version,
 		log:     d.Log,
 	}
@@ -45,6 +48,10 @@ func (h *Handler) Start(ctx *th.Context, msg telego.Message) error {
 	if payload, ok := command.StartPayload(msg.Text); ok {
 		if eventID, ok := callback.ParseSwapStart(payload); ok {
 			return h.swaps.Start(ctx, msg, eventID)
+		}
+
+		if eventID, ok := callback.ParseInviteStart(payload); ok {
+			return h.invites.Start(ctx, msg, eventID)
 		}
 	}
 

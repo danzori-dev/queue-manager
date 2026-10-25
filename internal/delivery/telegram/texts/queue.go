@@ -18,10 +18,11 @@ const (
 	EventTitleTooLong = "Название слишком длинное: не больше 100 символов."
 	EventCreated      = "Очередь создана и опубликована."
 
-	ButtonJoin  = "Встать в очередь"
-	ButtonLeave = "Выйти"
-	ButtonSkip  = "Пропустить место"
-	ButtonSwap  = "Поменяться местами"
+	ButtonJoin   = "Встать в очередь"
+	ButtonLeave  = "Выйти"
+	ButtonSkip   = "Пропустить место"
+	ButtonSwap   = "Поменяться местами"
+	ButtonInvite = "Пригласить к себе"
 
 	QueueClosed   = "Запись в эту очередь закрыта."
 	QueueNotFound = "Очередь не найдена."

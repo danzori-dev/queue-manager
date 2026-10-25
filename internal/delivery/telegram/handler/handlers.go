@@ -9,6 +9,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/admin"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/carry"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/general"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/invite"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/menu"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/queue"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/student"
@@ -39,6 +40,7 @@ type Deps struct {
 	Queues   QueueService
 	Students StudentService
 	Swaps    swap.SwapService
+	Invites  invite.InviteService
 }
 
 type Handlers struct {
@@ -49,6 +51,7 @@ type Handlers struct {
 	Menu    *menu.Handler
 	Carry   *carry.Handler
 	Swap    *swap.Handler
+	Invite  *invite.Handler
 }
 
 func New(d Deps) Handlers {
@@ -56,6 +59,7 @@ func New(d Deps) Handlers {
 
 	swapHandler := swap.New(replier, d.Swaps)
 	carryHandler := carry.New(replier, d.Queues)
+	inviteHandler := invite.New(replier, d.Invites)
 
 	return Handlers{
 		General: general.New(
@@ -63,6 +67,7 @@ func New(d Deps) Handlers {
 				Replier: replier,
 				Queues:  d.Queues,
 				Swaps:   swapHandler,
+				Invites: inviteHandler,
 				Version: d.Version,
 				Log:     d.Log,
 			},
@@ -75,10 +80,11 @@ func New(d Deps) Handlers {
 				APITimeout: d.APITimeout,
 			},
 		),
-		Admin: admin.New(replier, d.Admins, d.Students),
-		Queue: queue.New(replier, d.Queues, d.Students),
-		Menu:  menu.New(replier, d.Queues, carryHandler),
-		Carry: carryHandler,
-		Swap:  swapHandler,
+		Admin:  admin.New(replier, d.Admins, d.Students),
+		Queue:  queue.New(replier, d.Queues, d.Students),
+		Menu:   menu.New(replier, d.Queues, carryHandler),
+		Carry:  carryHandler,
+		Swap:   swapHandler,
+		Invite: inviteHandler,
 	}
 }

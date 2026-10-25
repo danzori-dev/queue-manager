@@ -5,14 +5,29 @@ import (
 	"strings"
 )
 
-const swapStartPrefix = "swap_"
+const (
+	swapStartPrefix   = "swap_"
+	inviteStartPrefix = "invite_"
+)
 
 func SwapStart(eventID int64) string {
 	return swapStartPrefix + strconv.FormatInt(eventID, 10)
 }
 
 func ParseSwapStart(payload string) (int64, bool) {
-	raw, ok := strings.CutPrefix(payload, swapStartPrefix)
+	return parseStart(payload, swapStartPrefix)
+}
+
+func InviteStart(eventID int64) string {
+	return inviteStartPrefix + strconv.FormatInt(eventID, 10)
+}
+
+func ParseInviteStart(payload string) (int64, bool) {
+	return parseStart(payload, inviteStartPrefix)
+}
+
+func parseStart(payload, prefix string) (int64, bool) {
+	raw, ok := strings.CutPrefix(payload, prefix)
 	if !ok {
 		return 0, false
 	}
