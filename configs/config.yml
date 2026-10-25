@@ -44,3 +44,8 @@ rate_limit:
     admin:
         burst: "${RATE_LIMIT_ADMIN_BURST:-5}"
         interval: "${RATE_LIMIT_ADMIN_INTERVAL:-3s}"
+
+request_limit:
+    window: "${REQUEST_LIMIT_WINDOW:-10m}"
+    max_failures: "${REQUEST_LIMIT_MAX_FAILURES:-5}"
+    pause: "${REQUEST_LIMIT_PAUSE:-2m}"
