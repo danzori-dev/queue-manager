@@ -5,6 +5,7 @@ import (
 	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 type EventRepository interface {
@@ -28,6 +29,7 @@ type EntryRepository interface {
 	SwapWithNext(ctx context.Context, eventID, userID int64) error
 	Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error
 	SwapSortKeys(ctx context.Context, eventID, userA, userB int64) error
+	JoinPlace(ctx context.Context, eventID, userID int64, username string, partnerID int64) error
 }
 
 type TargetRepository interface {
@@ -37,6 +39,7 @@ type TargetRepository interface {
 
 type StudentDirectory interface {
 	Name(userID int64) (string, bool)
+	List() []student.Student
 }
 
 type Messenger interface {
@@ -45,6 +48,7 @@ type Messenger interface {
 	Delete(ctx context.Context, event domain.Event)
 	AnnounceRemoval(ctx context.Context, removal Removal)
 	AskSwap(ctx context.Context, swap Swap) (int, error)
+	AskInvite(ctx context.Context, invite Invite) (int, error)
 }
 
 type RenderScheduler interface {

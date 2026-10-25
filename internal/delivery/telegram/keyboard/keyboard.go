@@ -16,6 +16,17 @@ func Back() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(tu.InlineKeyboardRow(button(texts.ButtonBack, callback.Action{Kind: callback.ActionList})))
 }
 
+func cancelRow(kind callback.ActionKind, eventID int64) []telego.InlineKeyboardButton {
+	return tu.InlineKeyboardRow(
+		button(
+			texts.ButtonCancel, callback.Action{
+				Kind:    kind,
+				EventID: eventID,
+			},
+		),
+	)
+}
+
 func button(label string, action callback.Action) telego.InlineKeyboardButton {
 	return tu.InlineKeyboardButton(label).WithCallbackData(action.String())
 }

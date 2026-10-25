@@ -14,7 +14,7 @@ import (
 )
 
 func SwapEvents(events []domain.Event) *telego.InlineKeyboardMarkup {
-	rows := make([][]telego.InlineKeyboardButton, 0, len(events))
+	rows := make([][]telego.InlineKeyboardButton, 0, len(events)+1)
 
 	for _, e := range events {
 		rows = append(
@@ -29,18 +29,30 @@ func SwapEvents(events []domain.Event) *telego.InlineKeyboardMarkup {
 		)
 	}
 
+	rows = append(rows, cancelRow(callback.ActionSwapAbort, 0))
+
 	return tu.InlineKeyboard(rows...)
 }
 
 func SwapPeople(view appqueue.View, selfID int64, requested int) (*telego.InlineKeyboardMarkup, Page) {
+	selfPos := 0
+
+	for _, l := range view.Lines {
+		if l.UserID == selfID {
+			selfPos = l.Position
+
+			break
+		}
+	}
+
 	others := slices.DeleteFunc(
 		slices.Clone(view.Lines), func(l appqueue.Line) bool {
-			return l.UserID == selfID
+			return l.Position == selfPos
 		},
 	)
 
 	p := paginate(len(others), requested)
-	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+1)
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, line := range others[p.start:p.end] {
 		rows = append(
@@ -65,6 +77,8 @@ func SwapPeople(view appqueue.View, selfID int64, requested int) (*telego.Inline
 			}
 		},
 	)
+
+	rows = append(rows, cancelRow(callback.ActionSwapAbort, view.Event.ID))
 
 	return tu.InlineKeyboard(rows...), p
 }

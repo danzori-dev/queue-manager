@@ -18,6 +18,7 @@ func Queue(view appqueue.View, botUsername string) *telego.InlineKeyboardMarkup 
 	}
 
 	swapURL := fmt.Sprintf("https://t.me/%s?start=%s", botUsername, callback.SwapStart(view.Event.ID))
+	inviteURL := fmt.Sprintf("https://t.me/%s?start=%s", botUsername, callback.InviteStart(view.Event.ID))
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
@@ -43,5 +44,6 @@ func Queue(view appqueue.View, botUsername string) *telego.InlineKeyboardMarkup 
 			),
 			tu.InlineKeyboardButton(texts.ButtonSwap).WithURL(swapURL),
 		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(texts.ButtonInvite).WithURL(inviteURL)),
 	)
 }

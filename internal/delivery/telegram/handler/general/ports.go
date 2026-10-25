@@ -10,6 +10,6 @@ type QueueService interface {
 	OpenEventIDs(ctx context.Context) ([]int64, error)
 }
 
-type SwapStarter interface {
+type Starter interface {
 	Start(ctx context.Context, msg telego.Message, eventID int64) error
 }

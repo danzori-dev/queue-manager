@@ -68,7 +68,7 @@ func (h *Handler) Start(ctx context.Context, msg telego.Message, eventID int64) 
 		return h.reply.SendHTML(ctx, msg, text)
 	}
 
-	if len(view.Lines) < 2 {
+	if !hasOtherPlaces(view, msg.From.ID) {
 		return h.reply.SendHTML(ctx, msg, texts.SwapNobody)
 	}
 
@@ -91,8 +91,14 @@ func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, a
 	case callback.ActionSwapAbort:
 		return "", h.reply.EditMenu(ctx, query, texts.SwapAborted, keyboard.None())
 
-	case callback.ActionSwapAccept, callback.ActionSwapDecline, callback.ActionSwapCancel:
-		return h.resolve(ctx, query, a)
+	case callback.ActionSwapAccept:
+		return h.accept(ctx, query, a.EventID)
+
+	case callback.ActionSwapDecline:
+		return h.decline(ctx, query, a.EventID)
+
+	case callback.ActionSwapCancel:
+		return h.cancel(ctx, query, a.EventID)
 
 	default:
 		return "", callback.ErrUnknownAction
@@ -105,7 +111,7 @@ func (h *Handler) showCandidates(ctx context.Context, query telego.CallbackQuery
 		return h.stepFailed(ctx, query, err)
 	}
 
-	if len(view.Lines) < 2 {
+	if !hasOtherPlaces(view, query.From.ID) {
 		return h.reply.EditMenu(ctx, query, texts.SwapNobody, keyboard.None())
 	}
 
@@ -142,34 +148,6 @@ func (h *Handler) send(ctx context.Context, query telego.CallbackQuery, eventID,
 	return h.reply.EditMenu(ctx, query, texts.SwapSent(req.ToName), keyboard.SwapCancel(req.ID))
 }
 
-func (h *Handler) resolve(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
-	switch a.Kind {
-	case callback.ActionSwapAccept:
-		return h.accept(ctx, query, a.EventID)
-
-	case callback.ActionSwapDecline:
-		req, err := h.swaps.DeclineSwap(ctx, a.EventID, query.From.ID)
-		if err != nil {
-			return h.gone(ctx, query, err)
-		}
-
-		h.reply.Notify(ctx, req.FromID, texts.SwapDeclinedForInitiator(req.ToName, req.Event.Title))
-		h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
-
-		return "", h.reply.EditMenu(ctx, query, texts.SwapDeclined, keyboard.None())
-
-	default:
-		req, err := h.swaps.CancelSwap(ctx, a.EventID, query.From.ID)
-		if err != nil {
-			return h.gone(ctx, query, err)
-		}
-
-		h.reply.DeleteMessage(ctx, req.ToID, req.ToMessageID)
-
-		return "", h.reply.EditMenu(ctx, query, texts.SwapCanceled, keyboard.None())
-	}
-}
-
 func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
 	req, err := h.swaps.AcceptSwap(ctx, requestID, query.From.ID)
 
@@ -190,6 +168,29 @@ func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, reques
 	h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
 
 	return "", h.reply.EditMenu(ctx, query, texts.SwapAcceptedForAddressee(req.FromPos), keyboard.None())
+}
+
+func (h *Handler) decline(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
+	req, err := h.swaps.DeclineSwap(ctx, requestID, query.From.ID)
+	if err != nil {
+		return h.gone(ctx, query, err)
+	}
+
+	h.reply.Notify(ctx, req.FromID, texts.SwapDeclinedForInitiator(req.ToName, req.Event.Title))
+	h.reply.DeleteMessage(ctx, req.FromID, req.FromMessageID)
+
+	return "", h.reply.EditMenu(ctx, query, texts.SwapDeclined, keyboard.None())
+}
+
+func (h *Handler) cancel(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
+	req, err := h.swaps.CancelSwap(ctx, requestID, query.From.ID)
+	if err != nil {
+		return h.gone(ctx, query, err)
+	}
+
+	h.reply.DeleteMessage(ctx, req.ToID, req.ToMessageID)
+
+	return "", h.reply.EditMenu(ctx, query, texts.SwapCanceled, keyboard.None())
 }
 
 func (h *Handler) gone(ctx context.Context, query telego.CallbackQuery, err error) (string, error) {
@@ -225,11 +226,14 @@ func errorText(err error) (string, bool) {
 	case errors.Is(err, domain.ErrNotInQueue):
 		return texts.SwapNotInQueue, true
 
-	case errors.Is(err, domain.ErrSwapUnreachable):
-		return texts.SwapUnreachable, true
+	case errors.Is(err, domain.ErrUserUnreachable):
+		return texts.UserUnreachable, true
 
 	case errors.Is(err, domain.ErrSwapSelf):
 		return texts.SwapSelf, true
+
+	case errors.Is(err, domain.ErrSwapSamePlace):
+		return texts.SwapSamePlace, true
 
 	case errors.Is(err, domain.ErrSwapBusy):
 		return texts.SwapBusy, true
@@ -237,6 +241,16 @@ func errorText(err error) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func hasOtherPlaces(view appqueue.View, userID int64) bool {
+	me, ok := findLine(view, userID)
+
+	return ok && slices.ContainsFunc(
+		view.Lines, func(l appqueue.Line) bool {
+			return l.Position != me.Position
+		},
+	)
 }
 
 func findLine(view appqueue.View, userID int64) (appqueue.Line, bool) {

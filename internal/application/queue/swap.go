@@ -57,6 +57,10 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 		return Swap{}, err
 	}
 
+	if fromPos == toPos {
+		return Swap{}, domain.ErrSwapSamePlace
+	}
+
 	req, err := s.swaps.add(
 		domain.SwapRequest{
 			Event:         event,
@@ -88,7 +92,7 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 }
 
 func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapAddressee)
+	req, err := s.swaps.take(requestID, userID, addressee)
 	if err != nil {
 		return Swap{}, err
 	}
@@ -126,7 +130,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 }
 
 func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapAddressee)
+	req, err := s.swaps.take(requestID, userID, addressee)
 	if err != nil {
 		return Swap{}, err
 	}
@@ -135,7 +139,7 @@ func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap,
 }
 
 func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapInitiator)
+	req, err := s.swaps.take(requestID, userID, initiator)
 	if err != nil {
 		return Swap{}, err
 	}
@@ -149,16 +153,9 @@ func (s *Service) positions(ctx context.Context, eventID, userA, userB int64) (p
 		return 0, 0, fmt.Errorf("list entries: %w", err)
 	}
 
-	posA = slices.IndexFunc(
-		entries, func(e domain.Entry) bool {
-			return e.UserID == userA
-		},
-	) + 1
-	posB = slices.IndexFunc(
-		entries, func(e domain.Entry) bool {
-			return e.UserID == userB
-		},
-	) + 1
+	places := domain.Places(entries)
+	posA = domain.PlaceOf(places, userA)
+	posB = domain.PlaceOf(places, userB)
 
 	if posA == 0 || posB == 0 {
 		return 0, 0, domain.ErrNotInQueue

@@ -21,6 +21,7 @@ type Renderer interface {
 	Queue(view appqueue.View) (string, *telego.InlineKeyboardMarkup)
 	Removal(removal appqueue.Removal) string
 	SwapAsk(swap appqueue.Swap) (string, *telego.InlineKeyboardMarkup)
+	InviteAsk(invite appqueue.Invite) (string, *telego.InlineKeyboardMarkup)
 }
 
 type QueueMessengerDeps struct {
@@ -173,10 +174,32 @@ func (m *QueueMessenger) AskSwap(ctx context.Context, swap appqueue.Swap) (int, 
 	msg, err := m.bot.SendMessage(reqCtx, params)
 	if err != nil {
 		if apiErr, ok := errors.AsType[*ta.Error](err); ok && apiErr.ErrorCode == http.StatusForbidden {
-			return 0, domain.ErrSwapUnreachable
+			return 0, domain.ErrUserUnreachable
 		}
 
 		return 0, fmt.Errorf("send swap request: %w", err)
+	}
+
+	return msg.MessageID, nil
+}
+
+func (m *QueueMessenger) AskInvite(ctx context.Context, invite appqueue.Invite) (int, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
+	defer cancel()
+
+	text, kb := m.render.InviteAsk(invite)
+
+	params := tu.Message(tu.ID(invite.ToID), text).
+		WithParseMode(telego.ModeHTML).
+		WithReplyMarkup(kb)
+
+	msg, err := m.bot.SendMessage(reqCtx, params)
+	if err != nil {
+		if apiErr, ok := errors.AsType[*ta.Error](err); ok && apiErr.ErrorCode == http.StatusForbidden {
+			return 0, domain.ErrUserUnreachable
+		}
+
+		return 0, fmt.Errorf("send invite: %w", err)
 	}
 
 	return msg.MessageID, nil

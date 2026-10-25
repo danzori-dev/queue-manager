@@ -82,7 +82,7 @@ func (r *EntryRepository) Position(ctx context.Context, eventID, userID int64) (
 	defer cancel()
 
 	const query = `
-		SELECT count(*)
+		SELECT count(DISTINCT sort_key)
 		FROM queue_entries
 		WHERE event_id = ?
 			AND sort_key <= (SELECT sort_key FROM queue_entries WHERE event_id = ? AND user_id = ?)
@@ -105,10 +105,10 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 	defer cancel()
 
 	const query = `
-		SELECT user_id, username
+		SELECT user_id, username, sort_key
 		FROM queue_entries
 		WHERE event_id = ?
-		ORDER BY sort_key
+		ORDER BY sort_key, id
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, eventID)
@@ -125,7 +125,7 @@ func (r *EntryRepository) List(ctx context.Context, eventID int64) ([]domain.Ent
 	for rows.Next() {
 		var entry domain.Entry
 
-		if err := rows.Scan(&entry.UserID, &entry.Username); err != nil {
+		if err := rows.Scan(&entry.UserID, &entry.Username, &entry.SortKey); err != nil {
 			return nil, fmt.Errorf("scan entry: %w", err)
 		}
 
@@ -151,23 +151,9 @@ func (r *EntryRepository) SwapWithNext(ctx context.Context, eventID, userID int6
 		`
 
 		nextQuery = `
-			SELECT id, sort_key
+			SELECT min(sort_key)
 			FROM queue_entries
 			WHERE event_id = ? AND sort_key > ?
-			ORDER BY sort_key
-			LIMIT 1
-		`
-
-		setKeyByUser = `
-			UPDATE queue_entries
-			SET sort_key = ?
-			WHERE event_id = ? AND user_id = ?
-		`
-
-		setKeyByID = `
-			UPDATE queue_entries
-			SET sort_key = ?
-			WHERE id = ?
 		`
 	)
 
@@ -193,25 +179,21 @@ func (r *EntryRepository) SwapWithNext(ctx context.Context, eventID, userID int6
 		return fmt.Errorf("query entry: %w", err)
 	}
 
-	var nextID, nextKey int64
+	var next sql.NullInt64
 
 	err = tx.
 		QueryRowContext(ctx, nextQuery, eventID, key).
-		Scan(&nextID, &nextKey)
-	if errors.Is(err, sql.ErrNoRows) {
+		Scan(&next)
+	if err != nil {
+		return fmt.Errorf("query next place: %w", err)
+	}
+
+	if !next.Valid {
 		return domain.ErrLastInQueue
 	}
 
-	if err != nil {
-		return fmt.Errorf("query next entry: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, setKeyByUser, nextKey, eventID, userID); err != nil {
-		return fmt.Errorf("move entry down: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, setKeyByID, key, nextID); err != nil {
-		return fmt.Errorf("move next entry up: %w", err)
+	if err := swapPlaces(ctx, tx, eventID, key, next.Int64); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -257,11 +239,14 @@ func (r *EntryRepository) Prepend(ctx context.Context, eventID int64, entries []
 		return fmt.Errorf("query min sort key: %w", err)
 	}
 
-	first := minKey - int64(len(entries))
+	places := domain.Places(entries)
+	first := minKey - int64(len(places))
 
-	for i, e := range entries {
-		if _, err := tx.ExecContext(ctx, upsertQuery, eventID, e.UserID, e.Username, first+int64(i)); err != nil {
-			return fmt.Errorf("upsert entry: %w", err)
+	for i, place := range places {
+		for _, e := range place {
+			if _, err := tx.ExecContext(ctx, upsertQuery, eventID, e.UserID, e.Username, first+int64(i)); err != nil {
+				return fmt.Errorf("upsert entry: %w", err)
+			}
 		}
 	}
 
@@ -276,19 +261,11 @@ func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, user
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	const (
-		keyQuery = `
-			SELECT sort_key
-			FROM queue_entries
-			WHERE event_id = ? AND user_id = ?
-		`
-
-		setKeyQuery = `
-			UPDATE queue_entries
-			SET sort_key = ?
-			WHERE event_id = ? AND user_id = ?
-		`
-	)
+	const query = `
+		SELECT sort_key
+		FROM queue_entries
+		WHERE event_id = ? AND user_id = ?
+	`
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -302,7 +279,7 @@ func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, user
 	var keyA, keyB int64
 
 	err = tx.
-		QueryRowContext(ctx, keyQuery, eventID, userA).
+		QueryRowContext(ctx, query, eventID, userA).
 		Scan(&keyA)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ErrNotInQueue
@@ -313,7 +290,7 @@ func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, user
 	}
 
 	err = tx.
-		QueryRowContext(ctx, keyQuery, eventID, userB).
+		QueryRowContext(ctx, query, eventID, userB).
 		Scan(&keyB)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ErrNotInQueue
@@ -323,16 +300,112 @@ func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, user
 		return fmt.Errorf("query second entry: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, setKeyQuery, keyB, eventID, userA); err != nil {
-		return fmt.Errorf("update first entry: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, setKeyQuery, keyA, eventID, userB); err != nil {
-		return fmt.Errorf("update second entry: %w", err)
+	if err := swapPlaces(ctx, tx, eventID, keyA, keyB); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func (r *EntryRepository) JoinPlace(ctx context.Context, eventID, userID int64, username string, partnerID int64) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const (
+		keyQuery = `
+			SELECT sort_key
+			FROM queue_entries
+			WHERE event_id = ? AND user_id = ?
+		`
+
+		sizeQuery = `
+			SELECT count(*)
+			FROM queue_entries
+			WHERE event_id = ? AND sort_key = ?
+		`
+
+		upsertQuery = `
+			INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT (event_id, user_id) DO UPDATE 
+			    SET sort_key = excluded.sort_key,
+			        username = excluded.username
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var key int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, partnerID).
+		Scan(&key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotInQueue
+	}
+
+	if err != nil {
+		return fmt.Errorf("query partner entry: %w", err)
+	}
+
+	var current int64
+
+	err = tx.
+		QueryRowContext(ctx, keyQuery, eventID, userID).
+		Scan(&current)
+
+	switch {
+	case err == nil && current == key:
+		return domain.ErrAlreadyOnPlace
+
+	case err != nil && !errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("query entry: %w", err)
+	}
+
+	var size int
+
+	if err := tx.QueryRowContext(ctx, sizeQuery, eventID, key).Scan(&size); err != nil {
+		return fmt.Errorf("query place size: %w", err)
+	}
+
+	if size >= domain.MaxPlaceSize {
+		return domain.ErrPlaceFull
+	}
+
+	if _, err := tx.ExecContext(ctx, upsertQuery, eventID, userID, username, key); err != nil {
+		return fmt.Errorf("upsert entry: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func swapPlaces(ctx context.Context, tx *sql.Tx, eventID, keyA, keyB int64) error {
+	const query = `
+		UPDATE queue_entries
+		SET sort_key = CASE sort_key
+		    WHEN ? THEN ?
+		    ELSE ?
+		END
+		WHERE event_id = ? AND sort_key IN (?, ?)
+	`
+
+	if _, err := tx.ExecContext(ctx, query, keyA, keyB, keyA, eventID, keyA, keyB); err != nil {
+		return fmt.Errorf("swap places: %w", err)
 	}
 
 	return nil
