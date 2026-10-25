@@ -1,6 +1,9 @@
 package queue
 
-import domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+import (
+	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
+)
 
 type JoinResult struct {
 	Position int
@@ -37,4 +40,17 @@ type Swap struct {
 
 	FromName string
 	ToName   string
+}
+
+type Invite struct {
+	domain.InviteRequest
+
+	FromName string
+	ToName   string
+}
+
+type InviteCandidates struct {
+	Event    domain.Event
+	Position int
+	Students []student.Student
 }

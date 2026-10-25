@@ -35,6 +35,8 @@ const (
 	ActionSwapAccept    ActionKind = "swapaccept"
 	ActionSwapDecline   ActionKind = "swapdecline"
 	ActionSwapCancel    ActionKind = "swapcancel"
+	ActionInviteAccept             = "inviteaccept"
+	ActionInviteDecline            = "invitedecline"
 )
 
 type Action struct {

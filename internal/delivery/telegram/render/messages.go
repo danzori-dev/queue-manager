@@ -27,3 +27,7 @@ func (m *Messages) Removal(removal appqueue.Removal) string {
 func (m *Messages) SwapAsk(swap appqueue.Swap) (string, *telego.InlineKeyboardMarkup) {
 	return texts.SwapAsk(swap), keyboard.SwapAnswer(swap.ID)
 }
+
+func (m *Messages) InviteAsk(invite appqueue.Invite) (string, *telego.InlineKeyboardMarkup) {
+	return texts.InviteAsk(invite), keyboard.InviteAnswer(invite.ID)
+}

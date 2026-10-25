@@ -92,7 +92,7 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 }
 
 func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapAddressee)
+	req, err := s.swaps.take(requestID, userID, addressee)
 	if err != nil {
 		return Swap{}, err
 	}
@@ -130,7 +130,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 }
 
 func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapAddressee)
+	req, err := s.swaps.take(requestID, userID, addressee)
 	if err != nil {
 		return Swap{}, err
 	}
@@ -139,7 +139,7 @@ func (s *Service) DeclineSwap(_ context.Context, requestID, userID int64) (Swap,
 }
 
 func (s *Service) CancelSwap(_ context.Context, requestID, userID int64) (Swap, error) {
-	req, err := s.swaps.take(requestID, userID, swapInitiator)
+	req, err := s.swaps.take(requestID, userID, initiator)
 	if err != nil {
 		return Swap{}, err
 	}

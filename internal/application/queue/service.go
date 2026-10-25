@@ -24,6 +24,7 @@ type Service struct {
 	messages  Messenger
 	scheduler RenderScheduler
 	swaps     *swapStore
+	invites   *inviteStore
 }
 
 func New(d Deps) *Service {
@@ -35,6 +36,7 @@ func New(d Deps) *Service {
 		messages:  d.Messages,
 		scheduler: d.Scheduler,
 		swaps:     newSwapStore(),
+		invites:   newInviteStore(),
 	}
 }
 

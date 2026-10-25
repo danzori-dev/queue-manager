@@ -6,13 +6,6 @@ import (
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
-type swapSide int
-
-const (
-	swapInitiator swapSide = iota
-	swapAddressee
-)
-
 type swapStore struct {
 	mu       sync.Mutex
 	nextID   int64
@@ -65,7 +58,7 @@ func (s *swapStore) remove(id int64) {
 	delete(s.requests, id)
 }
 
-func (s *swapStore) take(id, userID int64, side swapSide) (domain.SwapRequest, error) {
+func (s *swapStore) take(id, userID int64, side side) (domain.SwapRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -76,7 +69,7 @@ func (s *swapStore) take(id, userID int64, side swapSide) (domain.SwapRequest, e
 
 	allowed := req.FromID
 
-	if side == swapAddressee {
+	if side == addressee {
 		allowed = req.ToID
 	}
 

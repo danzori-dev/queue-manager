@@ -225,7 +225,7 @@ func errorText(err error) (string, bool) {
 	case errors.Is(err, domain.ErrNotInQueue):
 		return texts.SwapNotInQueue, true
 
-	case errors.Is(err, domain.ErrSwapUnreachable):
+	case errors.Is(err, domain.ErrUserUnreachable):
 		return texts.SwapUnreachable, true
 
 	case errors.Is(err, domain.ErrSwapSelf):
