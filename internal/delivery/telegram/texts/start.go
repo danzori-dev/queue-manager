@@ -18,6 +18,7 @@ const (
 		"<code>/carry &lt;откуда&gt; &lt;с_места&gt; &lt;куда&gt;</code> - перенести людей из одной закрытой очереди в начало другой"
 	HelpOwner = "<b>Владелец:</b>\n\n" +
 		"<code>/status</code> - состояние бота\n" +
+		"<code>/activity</code> - активность студентов за сутки\n" +
 		"<code>/addadmin &lt;user_id&gt;</code> - назначить администратора\n" +
 		"<code>/rmadmin &lt;user_id&gt;</code> - удалить администратора\n" +
 		"<code>/admins</code> - список администраторов\n" +

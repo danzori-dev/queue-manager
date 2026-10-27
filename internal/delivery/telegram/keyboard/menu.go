@@ -126,7 +126,7 @@ func RenameCancel(eventID int64) *telego.InlineKeyboardMarkup {
 
 func Members(view appqueue.View, requested int, selfID int64) (*telego.InlineKeyboardMarkup, Page) {
 	eventID := view.Event.ID
-	p := paginate(len(view.Lines), requested)
+	p := paginate(len(view.Lines), requested, pageSize)
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, line := range view.Lines[p.start:p.end] {

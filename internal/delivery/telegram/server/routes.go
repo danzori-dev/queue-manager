@@ -85,6 +85,12 @@ func RegisterRoutes(p RouteParams) Register {
 			),
 		)
 
+		private.HandleMessage(p.Handlers.Activity.Activity, th.CommandEqual("activity"))
+		bh.HandleCallbackQuery(
+			p.Handlers.Activity.Callback, th.AnyCallbackQueryWithMessage(),
+			actions(callback.ActionActivityList, callback.ActionActivityLog),
+		)
+
 		private.HandleMessage(p.Handlers.Admin.Add, th.CommandEqual("addadmin"))
 		private.HandleMessage(p.Handlers.Admin.Remove, th.CommandEqual("rmadmin"))
 		private.HandleMessage(p.Handlers.Admin.List, th.CommandEqual("admins"))

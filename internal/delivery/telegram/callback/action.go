@@ -43,6 +43,8 @@ const (
 	ActionInviteAccept  ActionKind = "inviteaccept"
 	ActionInviteDecline ActionKind = "invitedecline"
 	ActionInviteCancel  ActionKind = "invitecancel"
+	ActionActivityList  ActionKind = "activitylist"
+	ActionActivityLog   ActionKind = "activitylog"
 )
 
 type Action struct {

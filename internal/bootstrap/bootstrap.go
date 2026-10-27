@@ -219,6 +219,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 						Students:   studentSvc,
 						Swaps:      queueSvc,
 						Invites:    queueSvc,
+						Activity:   activityJournal,
 					},
 				),
 				RoleResolver: adminSvc,

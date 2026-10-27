@@ -6,6 +6,7 @@ import (
 
 	"github.com/mymmrac/telego"
 
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/activity"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/admin"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/carry"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/handler/general"
@@ -41,17 +42,19 @@ type Deps struct {
 	Students StudentService
 	Swaps    swap.SwapService
 	Invites  invite.InviteService
+	Activity activity.Journal
 }
 
 type Handlers struct {
-	General *general.Handler
-	Student *student.Handler
-	Admin   *admin.Handler
-	Queue   *queue.Handler
-	Menu    *menu.Handler
-	Carry   *carry.Handler
-	Swap    *swap.Handler
-	Invite  *invite.Handler
+	General  *general.Handler
+	Student  *student.Handler
+	Admin    *admin.Handler
+	Queue    *queue.Handler
+	Menu     *menu.Handler
+	Carry    *carry.Handler
+	Swap     *swap.Handler
+	Invite   *invite.Handler
+	Activity *activity.Handler
 }
 
 func New(d Deps) Handlers {
@@ -80,11 +83,12 @@ func New(d Deps) Handlers {
 				APITimeout: d.APITimeout,
 			},
 		),
-		Admin:  admin.New(replier, d.Admins, d.Students),
-		Queue:  queue.New(replier, d.Queues, d.Students),
-		Menu:   menu.New(replier, d.Queues, carryHandler),
-		Carry:  carryHandler,
-		Swap:   swapHandler,
-		Invite: inviteHandler,
+		Admin:    admin.New(replier, d.Admins, d.Students),
+		Queue:    queue.New(replier, d.Queues, d.Students),
+		Menu:     menu.New(replier, d.Queues, carryHandler),
+		Carry:    carryHandler,
+		Swap:     swapHandler,
+		Invite:   inviteHandler,
+		Activity: activity.New(replier, d.Activity, d.Students),
 	}
 }
