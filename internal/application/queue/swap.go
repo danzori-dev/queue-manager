@@ -94,10 +94,10 @@ func (s *Service) RequestSwap(ctx context.Context, eventID, fromID, toID int64, 
 	swap.ToMessageID = messageID
 
 	s.audit(
-		ctx, "swap requested",
-		slog.Int64("event_id", swap.Event.ID),
-		slog.Int64("peer_user_id", swap.ToID),
-		slog.String("peer_name", swap.ToName),
+		ctx, fromID, ActionSwapRequested,
+		slog.Int64(AttrEventID, swap.Event.ID),
+		slog.Int64(AttrPeerUserID, swap.ToID),
+		slog.String(AttrPeerName, swap.ToName),
 	)
 
 	return swap, nil
@@ -138,10 +138,10 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 
 	s.scheduler.Schedule(req.Event.ID)
 	s.audit(
-		ctx, "swap accepted",
-		slog.Int64("event_id", swap.Event.ID),
-		slog.Int64("peer_user_id", swap.FromID),
-		slog.String("peer_name", swap.FromName),
+		ctx, userID, ActionSwapAccepted,
+		slog.Int64(AttrEventID, swap.Event.ID),
+		slog.Int64(AttrPeerUserID, swap.FromID),
+		slog.String(AttrPeerName, swap.FromName),
 	)
 
 	return swap, nil
@@ -157,10 +157,10 @@ func (s *Service) DeclineSwap(ctx context.Context, requestID, userID int64) (Swa
 
 	swap := s.named(req)
 	s.audit(
-		ctx, "swap declined",
-		slog.Int64("event_id", swap.Event.ID),
-		slog.Int64("peer_user_id", swap.FromID),
-		slog.String("peer_name", swap.FromName),
+		ctx, userID, ActionSwapDeclined,
+		slog.Int64(AttrEventID, swap.Event.ID),
+		slog.Int64(AttrPeerUserID, swap.FromID),
+		slog.String(AttrPeerName, swap.FromName),
 	)
 
 	return swap, nil
@@ -176,10 +176,10 @@ func (s *Service) CancelSwap(ctx context.Context, requestID, userID int64) (Swap
 
 	swap := s.named(req)
 	s.audit(
-		ctx, "swap canceled",
-		slog.Int64("event_id", swap.Event.ID),
-		slog.Int64("peer_user_id", swap.ToID),
-		slog.String("peer_name", swap.ToName),
+		ctx, userID, ActionSwapCanceled,
+		slog.Int64(AttrEventID, swap.Event.ID),
+		slog.Int64(AttrPeerUserID, swap.ToID),
+		slog.String(AttrPeerName, swap.ToName),
 	)
 
 	return swap, nil

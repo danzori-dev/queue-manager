@@ -22,7 +22,7 @@ func (s *Service) PlanCarry(ctx context.Context, fromID int64, fromPos int, toID
 	}, nil
 }
 
-func (s *Service) Carry(ctx context.Context, fromID int64, fromPos int, toID int64) (int, error) {
+func (s *Service) Carry(ctx context.Context, fromID int64, fromPos int, toID, actorID int64) (int, error) {
 	c, err := s.carry(ctx, fromID, fromPos, toID)
 	if err != nil {
 		return 0, err
@@ -34,10 +34,10 @@ func (s *Service) Carry(ctx context.Context, fromID int64, fromPos int, toID int
 
 	s.scheduler.Schedule(c.to.ID)
 	s.audit(
-		ctx, "queue carried over",
-		slog.Int64("from_event_id", c.from.ID),
-		slog.Int64("to_event_id", c.to.ID),
-		slog.Int("count", len(c.entries)),
+		ctx, actorID, ActionEventCarriedOver,
+		slog.Int64(AttrFromEventID, c.from.ID),
+		slog.Int64(AttrToEventID, c.to.ID),
+		slog.Int(AttrCount, len(c.entries)),
 	)
 
 	return len(c.entries), nil

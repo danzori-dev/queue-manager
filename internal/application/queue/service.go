@@ -17,6 +17,7 @@ type Deps struct {
 	Scheduler    RenderScheduler
 	RequestLimit RequestLimit
 	Log          *slog.Logger
+	Activity     ActivityRecorder
 }
 
 type Service struct {
@@ -29,7 +30,8 @@ type Service struct {
 	swaps     *swapStore
 	invites   *inviteStore
 	throttle  *requestThrottle
-	log       *slog.Logger
+	auditLog  *slog.Logger
+	activity  ActivityRecorder
 }
 
 func New(d Deps) *Service {
@@ -43,7 +45,8 @@ func New(d Deps) *Service {
 		swaps:     newSwapStore(),
 		invites:   newInviteStore(),
 		throttle:  newRequestThrottle(d.RequestLimit),
-		log:       d.Log,
+		auditLog:  d.Log.With(slog.Bool("audit", true)),
+		activity:  d.Activity,
 	}
 }
 
@@ -99,6 +102,7 @@ func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
 	return lines
 }
 
-func (s *Service) audit(ctx context.Context, action string, attrs ...slog.Attr) {
-	s.log.LogAttrs(ctx, slog.LevelInfo, action, append([]slog.Attr{slog.Bool("audit", true)}, attrs...)...)
+func (s *Service) audit(ctx context.Context, userID int64, action string, attrs ...slog.Attr) {
+	s.auditLog.LogAttrs(ctx, slog.LevelInfo, action, attrs...)
+	s.activity.Record(userID, action, attrs)
 }

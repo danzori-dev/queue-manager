@@ -114,10 +114,10 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 	invite.ToMessageID = messageID
 
 	s.audit(
-		ctx, "invite sent",
-		slog.Int64("event_id", invite.Event.ID),
-		slog.Int64("peer_user_id", invite.ToID),
-		slog.String("peer_name", invite.ToName),
+		ctx, fromID, ActionInviteSent,
+		slog.Int64(AttrEventID, invite.Event.ID),
+		slog.Int64(AttrPeerUserID, invite.ToID),
+		slog.String(AttrPeerName, invite.ToName),
 	)
 
 	return invite, nil
@@ -158,11 +158,11 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 	invite.Position = pos
 
 	s.audit(
-		ctx, "invite accepted",
-		slog.Int64("event_id", invite.Event.ID),
-		slog.Int64("peer_user_id", invite.FromID),
-		slog.String("peer_name", invite.FromName),
-		slog.Int("position", pos),
+		ctx, userID, ActionInviteAccepted,
+		slog.Int64(AttrEventID, invite.Event.ID),
+		slog.Int64(AttrPeerUserID, invite.FromID),
+		slog.String(AttrPeerName, invite.FromName),
+		slog.Int(AttrPosition, pos),
 	)
 
 	return invite, nil
@@ -178,10 +178,10 @@ func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (I
 
 	invite := s.namedInvite(req)
 	s.audit(
-		ctx, "invite declined",
-		slog.Int64("event_id", invite.Event.ID),
-		slog.Int64("peer_user_id", invite.FromID),
-		slog.String("peer_name", invite.FromName),
+		ctx, userID, ActionInviteDeclined,
+		slog.Int64(AttrEventID, invite.Event.ID),
+		slog.Int64(AttrPeerUserID, invite.FromID),
+		slog.String(AttrPeerName, invite.FromName),
 	)
 
 	return invite, nil
@@ -197,10 +197,10 @@ func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64) (In
 
 	invite := s.namedInvite(req)
 	s.audit(
-		ctx, "invite canceled",
-		slog.Int64("event_id", invite.Event.ID),
-		slog.Int64("peer_user_id", invite.ToID),
-		slog.String("peer_name", invite.ToName),
+		ctx, userID, ActionInviteCanceled,
+		slog.Int64(AttrEventID, invite.Event.ID),
+		slog.Int64(AttrPeerUserID, invite.ToID),
+		slog.String(AttrPeerName, invite.ToName),
 	)
 
 	return invite, nil
