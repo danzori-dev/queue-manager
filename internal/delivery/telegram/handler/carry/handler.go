@@ -62,7 +62,7 @@ func (h *Handler) Confirm(ctx context.Context, query telego.CallbackQuery, fromI
 		return texts.CarryExpired, h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
 	}
 
-	moved, err := h.queues.Carry(ctx, draft.fromID, draft.fromPos, draft.toID)
+	moved, err := h.queues.Carry(ctx, draft.fromID, draft.fromPos, draft.toID, query.From.ID)
 	if err != nil {
 		text, known := errorText(err)
 		if !known {

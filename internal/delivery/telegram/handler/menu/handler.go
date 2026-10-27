@@ -186,7 +186,7 @@ func (h *Handler) showMenu(ctx context.Context, query telego.CallbackQuery, even
 }
 
 func (h *Handler) closeEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
-	err := h.queues.CloseEvent(ctx, eventID)
+	err := h.queues.CloseEvent(ctx, eventID, query.From.ID)
 	if errors.Is(err, domain.ErrEventNotFound) {
 		return texts.QueueNotFound, h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back())
 	}
@@ -199,7 +199,7 @@ func (h *Handler) closeEvent(ctx context.Context, query telego.CallbackQuery, ev
 }
 
 func (h *Handler) openEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
-	err := h.queues.OpenEvent(ctx, eventID)
+	err := h.queues.OpenEvent(ctx, eventID, query.From.ID)
 	if errors.Is(err, domain.ErrEventNotFound) {
 		return texts.QueueNotFound, h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back())
 	}
@@ -212,7 +212,7 @@ func (h *Handler) openEvent(ctx context.Context, query telego.CallbackQuery, eve
 }
 
 func (h *Handler) rename(ctx context.Context, msg telego.Message, eventID int64, title string) (bool, error) {
-	err := h.queues.RenameEvent(ctx, eventID, title)
+	err := h.queues.RenameEvent(ctx, eventID, msg.From.ID, title)
 
 	switch {
 	case errors.Is(err, domain.ErrEmptyTitle):
@@ -264,7 +264,7 @@ func (h *Handler) showDeleteConfirm(ctx context.Context, query telego.CallbackQu
 }
 
 func (h *Handler) deleteEvent(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
-	err := h.queues.DeleteEvent(ctx, eventID)
+	err := h.queues.DeleteEvent(ctx, eventID, query.From.ID)
 	if errors.Is(err, domain.ErrEventNotFound) {
 		return texts.QueueNotFound, h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back())
 	}

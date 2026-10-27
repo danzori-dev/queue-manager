@@ -7,7 +7,10 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 )
 
-const pageSize = 8
+const (
+	pageSize       = 8
+	eventsPageSize = 20
+)
 
 type Page struct {
 	Index int
@@ -16,16 +19,24 @@ type Page struct {
 	end   int
 }
 
-func paginate(total, requested int) Page {
-	count := max(1, (total+pageSize-1)/pageSize)
+func (p Page) Bounds() (start, end int) {
+	return p.start, p.end
+}
+
+func PageOf(index int) int {
+	return index / pageSize
+}
+
+func paginate(total, requested, size int) Page {
+	count := max(1, (total+size-1)/size)
 	index := min(max(requested, 0), count-1)
-	start := index * pageSize
+	start := index * size
 
 	return Page{
 		Index: index,
 		Count: count,
 		start: start,
-		end:   min(start+pageSize, total),
+		end:   min(start+size, total),
 	}
 }
 

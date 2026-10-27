@@ -51,7 +51,7 @@ func SwapPeople(view appqueue.View, selfID int64, requested int) (*telego.Inline
 		},
 	)
 
-	p := paginate(len(others), requested)
+	p := paginate(len(others), requested, pageSize)
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, line := range others[p.start:p.end] {

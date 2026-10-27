@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -53,4 +54,8 @@ type Messenger interface {
 
 type RenderScheduler interface {
 	Schedule(eventID int64)
+}
+
+type ActivityRecorder interface {
+	Record(userID int64, action string, attrs []slog.Attr)
 }

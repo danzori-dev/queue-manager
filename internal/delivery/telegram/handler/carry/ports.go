@@ -8,5 +8,5 @@ import (
 
 type QueueService interface {
 	PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (appqueue.CarryPlan, error)
-	Carry(ctx context.Context, fromID int64, fromPos int, toID int64) (int, error)
+	Carry(ctx context.Context, fromID int64, fromPos int, toID, actorID int64) (int, error)
 }

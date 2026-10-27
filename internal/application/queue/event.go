@@ -31,7 +31,7 @@ func (s *Service) SetQueueTopic(ctx context.Context, chatID int64, threadID int)
 	return replaced, nil
 }
 
-func (s *Service) CreateEvent(ctx context.Context, title string) error {
+func (s *Service) CreateEvent(ctx context.Context, actorID int64, title string) error {
 	target, err := s.targets.Target(ctx)
 	if err != nil {
 		return fmt.Errorf("get queue target: %w", err)
@@ -63,15 +63,15 @@ func (s *Service) CreateEvent(ctx context.Context, title string) error {
 	}
 
 	s.audit(
-		ctx, "event created",
-		slog.Int64("event_id", event.ID),
-		slog.String("title", event.Title),
+		ctx, actorID, ActionEventCreated,
+		slog.Int64(AttrEventID, event.ID),
+		slog.String(AttrTitle, event.Title),
 	)
 
 	return nil
 }
 
-func (s *Service) RenameEvent(ctx context.Context, eventID int64, title string) error {
+func (s *Service) RenameEvent(ctx context.Context, eventID, actorID int64, title string) error {
 	title, err := domain.NormalizeTitle(title)
 	if err != nil {
 		return err
@@ -92,9 +92,9 @@ func (s *Service) RenameEvent(ctx context.Context, eventID int64, title string) 
 
 	s.scheduler.Schedule(eventID)
 	s.audit(
-		ctx, "event renamed",
-		slog.Int64("event_id", eventID),
-		slog.String("title", title),
+		ctx, actorID, ActionEventRenamed,
+		slog.Int64(AttrEventID, eventID),
+		slog.String(AttrTitle, title),
 	)
 
 	return nil
@@ -127,15 +127,15 @@ func (s *Service) EventView(ctx context.Context, eventID int64) (View, error) {
 	return s.view(ctx, event)
 }
 
-func (s *Service) CloseEvent(ctx context.Context, eventID int64) error {
-	return s.setStatus(ctx, eventID, domain.StatusClosed)
+func (s *Service) CloseEvent(ctx context.Context, eventID, actorID int64) error {
+	return s.setStatus(ctx, eventID, actorID, domain.StatusClosed)
 }
 
-func (s *Service) OpenEvent(ctx context.Context, eventID int64) error {
-	return s.setStatus(ctx, eventID, domain.StatusOpen)
+func (s *Service) OpenEvent(ctx context.Context, eventID, actorID int64) error {
+	return s.setStatus(ctx, eventID, actorID, domain.StatusOpen)
 }
 
-func (s *Service) DeleteEvent(ctx context.Context, eventID int64) error {
+func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error {
 	event, err := s.events.Get(ctx, eventID)
 	if err != nil {
 		return err
@@ -147,15 +147,15 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID int64) error {
 
 	s.messages.Delete(ctx, event)
 	s.audit(
-		ctx, "event deleted",
-		slog.Int64("event_id", eventID),
-		slog.String("title", event.Title),
+		ctx, actorID, ActionEventDeleted,
+		slog.Int64(AttrEventID, eventID),
+		slog.String(AttrTitle, event.Title),
 	)
 
 	return nil
 }
 
-func (s *Service) setStatus(ctx context.Context, eventID int64, status domain.Status) error {
+func (s *Service) setStatus(ctx context.Context, eventID, actorID int64, status domain.Status) error {
 	event, err := s.events.Get(ctx, eventID)
 	if err != nil {
 		return err
@@ -170,15 +170,15 @@ func (s *Service) setStatus(ctx context.Context, eventID int64, status domain.St
 	}
 
 	s.scheduler.Schedule(eventID)
-	s.audit(ctx, statusAction(status), slog.Int64("event_id", eventID))
+	s.audit(ctx, actorID, statusAction(status), slog.Int64(AttrEventID, eventID))
 
 	return nil
 }
 
 func statusAction(status domain.Status) string {
 	if status == domain.StatusClosed {
-		return "event closed"
+		return ActionEventClosed
 	}
 
-	return "event reopened"
+	return ActionEventReopened
 }

@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/danzori-dev/queue-manager/internal/application/activity"
 	"github.com/danzori-dev/queue-manager/internal/application/admin"
 	"github.com/danzori-dev/queue-manager/internal/application/queue"
 	"github.com/danzori-dev/queue-manager/internal/application/student"
@@ -168,6 +169,8 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 		}, log,
 	)
 
+	activityJournal := activity.New()
+
 	queueSvc := queue.New(
 		queue.Deps{
 			Events:    eventRepo,
@@ -181,7 +184,8 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 				MaxFailures: cfg.RequestLimit.MaxFailures,
 				Pause:       cfg.RequestLimit.Pause,
 			},
-			Log: log,
+			Log:      log,
+			Activity: activityJournal,
 		},
 	)
 
@@ -215,6 +219,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 						Students:   studentSvc,
 						Swaps:      queueSvc,
 						Invites:    queueSvc,
+						Activity:   activityJournal,
 					},
 				),
 				RoleResolver: adminSvc,

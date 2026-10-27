@@ -34,7 +34,7 @@ func InviteEvents(events []domain.Event) *telego.InlineKeyboardMarkup {
 }
 
 func InvitePeople(c appqueue.InviteCandidates, requested int) (*telego.InlineKeyboardMarkup, Page) {
-	p := paginate(len(c.Students), requested)
+	p := paginate(len(c.Students), requested, pageSize)
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, st := range c.Students[p.start:p.end] {

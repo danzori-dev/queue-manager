@@ -24,9 +24,9 @@ func (s *Service) Join(ctx context.Context, eventID, userID int64, username stri
 	if added {
 		s.scheduler.Schedule(eventID)
 		s.audit(
-			ctx, "queue joined",
-			slog.Int64("event_id", eventID),
-			slog.Int("position", position),
+			ctx, userID, ActionQueueJoined,
+			slog.Int64(AttrEventID, eventID),
+			slog.Int(AttrPosition, position),
 		)
 	}
 
@@ -48,7 +48,7 @@ func (s *Service) Leave(ctx context.Context, eventID, userID int64) (bool, error
 
 	if removed {
 		s.scheduler.Schedule(eventID)
-		s.audit(ctx, "queue left", slog.Int64("event_id", eventID))
+		s.audit(ctx, userID, ActionQueueLeft, slog.Int64(AttrEventID, eventID))
 	}
 
 	return removed, nil
@@ -71,9 +71,9 @@ func (s *Service) Skip(ctx context.Context, eventID, userID int64) (int, error) 
 	}
 
 	s.audit(
-		ctx, "queue place skipped",
-		slog.Int64("event_id", eventID),
-		slog.Int("position", position),
+		ctx, userID, ActionQueuePlaceSkipped,
+		slog.Int64(AttrEventID, eventID),
+		slog.Int(AttrPosition, position),
 	)
 
 	return position, nil
@@ -97,7 +97,7 @@ func (s *Service) RemoveParticipant(ctx context.Context, eventID, actorID, userI
 	s.scheduler.Schedule(eventID)
 
 	if actorID == userID {
-		s.audit(ctx, "queue left", slog.Int64("event_id", eventID))
+		s.audit(ctx, userID, ActionQueueLeft, slog.Int64(AttrEventID, eventID))
 
 		return true, nil
 	}
@@ -105,10 +105,10 @@ func (s *Service) RemoveParticipant(ctx context.Context, eventID, actorID, userI
 	userName := s.studentName(userID)
 
 	s.audit(
-		ctx, "participant removed",
-		slog.Int64("event_id", eventID),
-		slog.Int64("peer_user_id", userID),
-		slog.String("peer_name", userName),
+		ctx, actorID, ActionParticipantRemoved,
+		slog.Int64(AttrEventID, eventID),
+		slog.Int64(AttrPeerUserID, userID),
+		slog.String(AttrPeerName, userName),
 	)
 
 	actorName, _ := s.students.Name(actorID)
