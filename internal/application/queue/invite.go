@@ -132,6 +132,10 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 	invite := s.namedInvite(req)
 
 	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
+		if !errors.Is(err, domain.ErrEventClosed) && !errors.Is(err, domain.ErrEventNotFound) {
+			s.invites.restore(req)
+		}
+
 		return invite, err
 	}
 
@@ -145,6 +149,7 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 		return invite, err
 
 	case err != nil:
+		s.invites.restore(req)
 		return invite, fmt.Errorf("join place: %w", err)
 	}
 
