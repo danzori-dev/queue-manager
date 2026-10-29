@@ -18,13 +18,6 @@ jobs:
         name: Image ${{ matrix.target }}
         runs-on: ubuntu-latest
         timeout-minutes: 20
-        strategy:
-            matrix:
-                include:
-                    -   target: runtime
-                        suffix: ""
-                    -   target: migrate
-                        suffix: "-migrate"
         steps:
             -   uses: actions/checkout@v7
 
@@ -39,7 +32,7 @@ jobs:
             -   id: meta
                 uses: docker/metadata-action@v6
                 with:
-                    images: ghcr.io/${{ github.repository }}${{ matrix.suffix }}
+                    images: ghcr.io/${{ github.repository }}
                     tags: |
                         type=semver,pattern={{version}}
                         type=semver,pattern={{major}}.{{minor}}
@@ -48,11 +41,11 @@ jobs:
             -   uses: docker/build-push-action@v7
                 with:
                     context: .
-                    target: ${{ matrix.target }}
+                    target: runtime
                     platforms: linux/amd64
                     build-args: VERSION=${{ github.ref_name }}
                     push: true
                     tags: ${{ steps.meta.outputs.tags }}
                     labels: ${{ steps.meta.outputs.labels }}
-                    cache-from: type=gha,scope=${{ matrix.target }}
-                    cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+                    cache-from: type=gha,scope=runtime
+                    cache-to: type=gha,mode=max,scope=runtime
