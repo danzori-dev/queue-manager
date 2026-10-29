@@ -149,7 +149,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	eventRepo := memory.NewEventCache(sqlite.NewEventRepository(db, cfg.SQLite.QueryTimeout))
 	entryRepo := sqlite.NewEntryRepository(db, cfg.SQLite.QueryTimeout)
-	targetRepo := sqlite.NewTargetRepository(db, cfg.SQLite.QueryTimeout)
+	targetRepo := memory.NewTargetCache(sqlite.NewTargetRepository(db, cfg.SQLite.QueryTimeout))
 
 	queueMessenger := telegram.NewQueueMessenger(
 		telegram.QueueMessengerDeps{

@@ -82,10 +82,7 @@ func (h *Handler) List(ctx *th.Context, msg telego.Message) error {
 		return err
 	}
 
-	ids, err := h.admins.List(ctx)
-	if err != nil {
-		return err
-	}
+	ids := h.admins.List()
 
 	labels := make([]string, 0, len(ids))
 	for _, id := range ids {
