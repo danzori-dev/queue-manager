@@ -150,6 +150,7 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 
 	case err != nil:
 		s.invites.restore(req)
+
 		return invite, fmt.Errorf("join place: %w", err)
 	}
 

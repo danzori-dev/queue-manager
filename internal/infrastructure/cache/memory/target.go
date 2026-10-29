@@ -58,6 +58,7 @@ func (c *TargetCache) Target(ctx context.Context) (domain.Target, error) {
 		c.target = target
 		c.loaded = true
 	}
+
 	target = c.target
 	c.mu.Unlock()
 

@@ -87,6 +87,7 @@ func (c *EventCache) ListRecent(ctx context.Context, limit int) ([]domain.Event,
 	for _, e := range events {
 		c.events[e.ID] = e
 	}
+
 	c.mu.Unlock()
 
 	return events, nil
@@ -110,6 +111,7 @@ func (c *EventCache) SetMessageID(ctx context.Context, eventID int64, messageID 
 		event.MessageID = messageID
 		c.events[eventID] = event
 	}
+
 	c.mu.Unlock()
 
 	return nil
@@ -125,6 +127,7 @@ func (c *EventCache) SetStatus(ctx context.Context, eventID int64, status domain
 		event.Status = status
 		c.events[eventID] = event
 	}
+
 	c.mu.Unlock()
 
 	return nil
@@ -140,6 +143,7 @@ func (c *EventCache) SetTitle(ctx context.Context, eventID int64, title string) 
 		event.Title = title
 		c.events[eventID] = event
 	}
+
 	c.mu.Unlock()
 
 	return nil

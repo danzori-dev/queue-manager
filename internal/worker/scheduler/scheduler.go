@@ -97,6 +97,7 @@ func (s *Scheduler) Run(ctx context.Context, r Renderer) error {
 
 		delete(s.states, id)
 	}
+
 	s.mu.Unlock()
 
 	s.wg.Wait()

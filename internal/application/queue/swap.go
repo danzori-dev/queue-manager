@@ -127,6 +127,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 
 	case err != nil:
 		s.swaps.restore(req)
+
 		return swap, err
 
 	case fromPos != req.FromPos || toPos != req.ToPos:
@@ -139,6 +140,7 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 		}
 
 		s.swaps.restore(req)
+
 		return swap, fmt.Errorf("swap sort keys: %w", err)
 	}
 
