@@ -20,6 +20,14 @@ type Config struct {
 	MaxAttempts int
 }
 
+type eventState struct {
+	timer     *time.Timer
+	inFlight  bool
+	dirty     bool
+	notBefore time.Time
+	failures  int
+}
+
 type Scheduler struct {
 	cfg Config
 	log *slog.Logger
@@ -27,25 +35,41 @@ type Scheduler struct {
 	mu       sync.Mutex
 	ctx      context.Context //nolint:containedctx // scheduler lifetime ctx
 	renderer Renderer
-	timers   map[int64]*time.Timer
-	lastRun  map[int64]time.Time
-	failures map[int64]int
+	states   map[int64]*eventState
 
 	wg sync.WaitGroup
 }
 
 func New(cfg Config, log *slog.Logger) *Scheduler {
 	return &Scheduler{
-		cfg:      cfg,
-		log:      log,
-		timers:   make(map[int64]*time.Timer),
-		lastRun:  make(map[int64]time.Time),
-		failures: make(map[int64]int),
+		cfg:    cfg,
+		log:    log,
+		states: make(map[int64]*eventState),
 	}
 }
 
 func (s *Scheduler) Schedule(eventID int64) {
-	s.schedule(eventID, s.cfg.Debounce)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ctx == nil || s.ctx.Err() != nil {
+		return
+	}
+
+	s.prune()
+
+	st := s.state(eventID)
+	if st.inFlight {
+		st.dirty = true
+
+		return
+	}
+
+	if st.timer != nil {
+		return
+	}
+
+	s.armTimer(eventID, st, s.cfg.Debounce)
 }
 
 func (s *Scheduler) Run(ctx context.Context, r Renderer) error {
@@ -66,12 +90,12 @@ func (s *Scheduler) Run(ctx context.Context, r Renderer) error {
 	<-ctx.Done()
 
 	s.mu.Lock()
-	for id, t := range s.timers {
-		if t.Stop() {
+	for id, st := range s.states {
+		if st.timer != nil && st.timer.Stop() {
 			s.wg.Done()
 		}
 
-		delete(s.timers, id)
+		delete(s.states, id)
 	}
 
 	s.mu.Unlock()
@@ -81,24 +105,14 @@ func (s *Scheduler) Run(ctx context.Context, r Renderer) error {
 	return nil
 }
 
-func (s *Scheduler) schedule(eventID int64, delay time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.ctx == nil || s.ctx.Err() != nil {
-		return
-	}
-
-	if _, ok := s.timers[eventID]; ok {
-		return
-	}
-
-	if wait := s.cfg.MinInterval - time.Since(s.lastRun[eventID]); wait > delay {
+func (s *Scheduler) armTimer(eventID int64, st *eventState, delay time.Duration) {
+	if wait := time.Until(st.notBefore); wait > delay {
 		delay = wait
 	}
 
 	s.wg.Add(1)
-	s.timers[eventID] = time.AfterFunc(
+
+	st.timer = time.AfterFunc(
 		delay, func() {
 			defer s.wg.Done()
 
@@ -109,12 +123,25 @@ func (s *Scheduler) schedule(eventID int64, delay time.Duration) {
 
 func (s *Scheduler) fire(eventID int64) {
 	s.mu.Lock()
-	delete(s.timers, eventID)
-	s.lastRun[eventID] = time.Now()
+	st := s.state(eventID)
+	st.timer = nil
+	st.inFlight = true
+	st.dirty = false
 	ctx, r := s.ctx, s.renderer
 	s.mu.Unlock()
 
 	retryAfter, err := r.RenderEvent(ctx, eventID)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if ctx.Err() != nil {
+		return
+	}
+
+	st.inFlight = false
+	now := time.Now()
+	st.notBefore = now.Add(s.cfg.MinInterval)
 
 	switch {
 	case err == nil && retryAfter > 0:
@@ -124,33 +151,29 @@ func (s *Scheduler) fire(eventID int64) {
 			slog.Duration("retry_after", retryAfter),
 		)
 
-		s.schedule(eventID, retryAfter)
+		st.notBefore = now.Add(retryAfter)
+		s.armTimer(eventID, st, retryAfter)
 
 	case err == nil:
-		s.mu.Lock()
-		delete(s.failures, eventID)
-		s.mu.Unlock()
+		st.failures = 0
 
-	case ctx.Err() != nil:
+		if st.dirty {
+			st.dirty = false
+			s.armTimer(eventID, st, s.cfg.Debounce)
+		}
 
 	default:
-		s.retry(ctx, eventID, err)
+		s.retry(ctx, eventID, st, err)
 	}
 }
 
-func (s *Scheduler) retry(ctx context.Context, eventID int64, err error) {
-	s.mu.Lock()
-	s.failures[eventID]++
-	attempts := s.failures[eventID]
+func (s *Scheduler) retry(ctx context.Context, eventID int64, st *eventState, err error) {
+	st.failures++
+	attempts := st.failures
 
-	giveUp := attempts >= s.cfg.MaxAttempts
-	if giveUp {
-		delete(s.failures, eventID)
-	}
+	if attempts >= s.cfg.MaxAttempts {
+		delete(s.states, eventID)
 
-	s.mu.Unlock()
-
-	if giveUp {
 		s.log.ErrorContext(
 			ctx, "queue render failed, giving up",
 			slog.Int64("event_id", eventID),
@@ -168,5 +191,25 @@ func (s *Scheduler) retry(ctx context.Context, eventID int64, err error) {
 		slog.Any("err", err),
 	)
 
-	s.schedule(eventID, s.cfg.RetryDelay)
+	s.armTimer(eventID, st, s.cfg.RetryDelay)
+}
+
+func (s *Scheduler) state(eventID int64) *eventState {
+	st, ok := s.states[eventID]
+	if !ok {
+		st = &eventState{}
+		s.states[eventID] = st
+	}
+
+	return st
+}
+
+func (s *Scheduler) prune() {
+	now := time.Now()
+
+	for id, st := range s.states {
+		if !st.inFlight && st.timer == nil && st.failures == 0 && !now.Before(st.notBefore) {
+			delete(s.states, id)
+		}
+	}
 }

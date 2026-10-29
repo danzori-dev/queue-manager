@@ -7,7 +7,7 @@ import (
 type AdminService interface {
 	Add(ctx context.Context, targetID int64) error
 	Remove(ctx context.Context, targetID int64) error
-	List(ctx context.Context) ([]int64, error)
+	List() []int64
 }
 
 type StudentService interface {

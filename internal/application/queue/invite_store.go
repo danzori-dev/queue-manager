@@ -58,6 +58,15 @@ func (s *inviteStore) remove(id int64) {
 	delete(s.requests, id)
 }
 
+func (s *inviteStore) restore(req domain.InviteRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !req.Expired() {
+		s.requests[req.ID] = req
+	}
+}
+
 func (s *inviteStore) take(id, userID int64, side side) (domain.InviteRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

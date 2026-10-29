@@ -112,6 +112,10 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 	swap := s.named(req)
 
 	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
+		if !errors.Is(err, domain.ErrEventClosed) && !errors.Is(err, domain.ErrEventNotFound) {
+			s.swaps.restore(req)
+		}
+
 		return swap, err
 	}
 
@@ -122,6 +126,8 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 		return swap, domain.ErrSwapChanged
 
 	case err != nil:
+		s.swaps.restore(req)
+
 		return swap, err
 
 	case fromPos != req.FromPos || toPos != req.ToPos:
@@ -132,6 +138,8 @@ func (s *Service) AcceptSwap(ctx context.Context, requestID, userID int64) (Swap
 		if errors.Is(err, domain.ErrNotInQueue) {
 			return swap, domain.ErrSwapChanged
 		}
+
+		s.swaps.restore(req)
 
 		return swap, fmt.Errorf("swap sort keys: %w", err)
 	}

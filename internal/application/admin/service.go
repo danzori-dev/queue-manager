@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/danzori-dev/queue-manager/internal/domain/access"
@@ -98,13 +99,18 @@ func (s *Service) Remove(ctx context.Context, targetID int64) error {
 	return nil
 }
 
-func (s *Service) List(ctx context.Context) ([]int64, error) {
-	ids, err := s.repo.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list admins: %w", err)
+func (s *Service) List() []int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	ids := make([]int64, 0, len(s.admins))
+	for id := range s.admins {
+		ids = append(ids, id)
 	}
 
-	return ids, nil
+	slices.Sort(ids)
+
+	return ids
 }
 
 func (s *Service) isAdmin(userID int64) bool {
