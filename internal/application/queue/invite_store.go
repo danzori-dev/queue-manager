@@ -6,6 +6,8 @@ import (
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
+const maxActiveInvites = 5
+
 type inviteStore struct {
 	mu       sync.Mutex
 	nextID   int64
@@ -22,6 +24,8 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	activeInvites := 0
+
 	for id, r := range s.requests {
 		if r.Expired() {
 			delete(s.requests, id)
@@ -29,9 +33,17 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 			continue
 		}
 
+		if r.FromID == req.FromID {
+			activeInvites++
+		}
+
 		if r.Involves(req.FromID) || r.Involves(req.ToID) {
 			return domain.InviteRequest{}, domain.ErrInviteBusy
 		}
+	}
+
+	if activeInvites >= maxActiveInvites {
+		return domain.InviteRequest{}, domain.ErrTooManyInvites
 	}
 
 	s.nextID++
