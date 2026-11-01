@@ -18,7 +18,7 @@ type EventRepository interface {
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	SetTitle(ctx context.Context, eventID int64, title string) error
 	Delete(ctx context.Context, eventID int64) error
-	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
+	DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error)
 }
 
 type EventCache struct {
@@ -36,16 +36,16 @@ func NewEventCache(inner EventRepository) *EventCache {
 }
 
 func (c *EventCache) Create(ctx context.Context, event domain.Event) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	id, err := c.inner.Create(ctx, event)
 	if err != nil {
 		return 0, err
 	}
 
 	event.ID = id
-
-	c.mu.Lock()
 	c.events[id] = event
-	c.mu.Unlock()
 
 	return id, nil
 }
@@ -59,36 +59,35 @@ func (c *EventCache) Get(ctx context.Context, eventID int64) (domain.Event, erro
 		return event, nil
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if cached, exists := c.events[eventID]; exists {
+		return cached, nil
+	}
+
 	event, err := c.inner.Get(ctx, eventID)
 	if err != nil {
 		return domain.Event{}, err
 	}
 
-	c.mu.Lock()
-	if cached, exists := c.events[eventID]; exists {
-		c.mu.Unlock()
-
-		return cached, nil
-	}
-
 	c.events[eventID] = event
-	c.mu.Unlock()
 
 	return event, nil
 }
 
 func (c *EventCache) ListRecent(ctx context.Context, limit int) ([]domain.Event, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	events, err := c.inner.ListRecent(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	c.mu.Lock()
-	for _, e := range events {
-		c.events[e.ID] = e
+	for _, event := range events {
+		c.events[event.ID] = event
 	}
-
-	c.mu.Unlock()
 
 	return events, nil
 }
@@ -102,65 +101,84 @@ func (c *EventCache) ListOpenWithUser(ctx context.Context, userID int64) ([]doma
 }
 
 func (c *EventCache) SetMessageID(ctx context.Context, eventID int64, messageID int) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err := c.inner.SetMessageID(ctx, eventID, messageID); err != nil {
+		delete(c.events, eventID)
+
 		return err
 	}
 
-	c.mu.Lock()
 	if event, ok := c.events[eventID]; ok {
 		event.MessageID = messageID
 		c.events[eventID] = event
 	}
 
-	c.mu.Unlock()
-
 	return nil
 }
 
 func (c *EventCache) SetStatus(ctx context.Context, eventID int64, status domain.Status) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err := c.inner.SetStatus(ctx, eventID, status); err != nil {
+		delete(c.events, eventID)
+
 		return err
 	}
 
-	c.mu.Lock()
 	if event, ok := c.events[eventID]; ok {
 		event.Status = status
 		c.events[eventID] = event
 	}
 
-	c.mu.Unlock()
-
 	return nil
 }
 
 func (c *EventCache) SetTitle(ctx context.Context, eventID int64, title string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err := c.inner.SetTitle(ctx, eventID, title); err != nil {
+		delete(c.events, eventID)
+
 		return err
 	}
 
-	c.mu.Lock()
 	if event, ok := c.events[eventID]; ok {
 		event.Title = title
 		c.events[eventID] = event
 	}
-
-	c.mu.Unlock()
 
 	return nil
 }
 
 func (c *EventCache) Delete(ctx context.Context, eventID int64) error {
 	c.mu.Lock()
-	delete(c.events, eventID)
-	c.mu.Unlock()
+	defer c.mu.Unlock()
 
-	return c.inner.Delete(ctx, eventID)
+	err := c.inner.Delete(ctx, eventID)
+
+	delete(c.events, eventID)
+
+	return err
 }
 
-func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) (int, error) {
+func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error) {
 	c.mu.Lock()
-	clear(c.events)
-	c.mu.Unlock()
+	defer c.mu.Unlock()
 
-	return c.inner.DeleteClosedBefore(ctx, before)
+	deleted, err := c.inner.DeleteClosedBefore(ctx, before)
+	if err != nil {
+		clear(c.events)
+
+		return nil, err
+	}
+
+	for _, event := range deleted {
+		delete(c.events, event.ID)
+	}
+
+	return deleted, nil
 }
