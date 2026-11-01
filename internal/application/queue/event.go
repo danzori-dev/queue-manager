@@ -156,6 +156,7 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 			slog.Any("err", err),
 		)
 	}
+
 	s.audit(
 		ctx, actorID, ActionEventDeleted,
 		slog.Int64(AttrEventID, eventID),
