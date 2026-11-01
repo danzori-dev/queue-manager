@@ -18,28 +18,20 @@ func (s *Service) saveMessageID(ctx context.Context, eventID int64, messageID in
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), messageIDSaveTimeout)
 	defer cancel()
 
-	var lastErr error
+	for attempt := 1; ; attempt++ {
+		err := s.events.SetMessageID(ctx, eventID, messageID)
 
-	for attempt := 1; attempt <= messageIDSaveAttempts; attempt++ {
-		lastErr := s.events.SetMessageID(ctx, eventID, messageID)
-
-		if lastErr == nil || errors.Is(lastErr, domain.ErrEventNotFound) {
-			return lastErr
-		}
-
-		if attempt == messageIDSaveAttempts {
-			break
+		if err == nil || errors.Is(err, domain.ErrEventNotFound) || attempt >= messageIDSaveAttempts {
+			return err
 		}
 
 		select {
 		case <-ctx.Done():
-			return errors.Join(lastErr, ctx.Err())
+			return errors.Join(err, ctx.Err())
 
 		case <-time.After(messageIDBackoff(attempt)):
 		}
 	}
-
-	return lastErr
 }
 
 func messageIDBackoff(attempt int) time.Duration {
