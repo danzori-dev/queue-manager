@@ -254,6 +254,9 @@ func errorText(err error) (string, bool) {
 	case errors.Is(err, domain.ErrInviteBusy):
 		return texts.InviteBusy, true
 
+	case errors.Is(err, domain.ErrTooManyInvites):
+		return texts.InviteTooManyInvites, true
+
 	case errors.Is(err, domain.ErrRequestsTooOften):
 		return texts.RequestsTooOften(domain.RetryAfter(err)), true
 
