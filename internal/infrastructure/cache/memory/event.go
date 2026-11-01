@@ -176,8 +176,8 @@ func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) (
 		return nil, err
 	}
 
-	if len(deleted) > 0 {
-		clear(c.events)
+	for _, event := range deleted {
+		delete(c.events, event.ID)
 	}
 
 	return deleted, nil
