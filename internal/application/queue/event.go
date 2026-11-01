@@ -151,8 +151,8 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 		s.log.WarnContext(
 			ctx, "delete queue message",
 			slog.Int64(AttrEventID, event.ID),
-			slog.Int64(AttrEventChatID, event.ChatID),
-			slog.Int(AttrMessageID, event.MessageID),
+			slog.Int64("event_chat_id", event.ChatID),
+			slog.Int("message_id", event.MessageID),
 			slog.Any("err", err),
 		)
 	}

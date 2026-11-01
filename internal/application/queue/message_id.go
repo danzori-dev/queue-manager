@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -25,11 +26,22 @@ func (s *Service) saveMessageID(ctx context.Context, eventID int64, messageID in
 			return err
 		}
 
+		delay := messageIDBackoff(attempt)
+
+		s.log.InfoContext(
+			ctx, "event message id save failed, retrying",
+			slog.Int64(AttrEventID, eventID),
+			slog.Int("message_id", messageID),
+			slog.Int("attempt", attempt),
+			slog.Duration("retry_delay", delay),
+			slog.Any("err", err),
+		)
+
 		select {
 		case <-ctx.Done():
 			return errors.Join(err, ctx.Err())
 
-		case <-time.After(messageIDBackoff(attempt)):
+		case <-time.After(delay):
 		}
 	}
 }

@@ -34,8 +34,8 @@ func (s *Service) rollbackCreatedEvent(ctx context.Context, event domain.Event) 
 			ctx, "event creation rollback incomplete",
 			slog.Int64(AttrEventID, event.ID),
 			slog.String(AttrTitle, event.Title),
-			slog.Int64(AttrEventChatID, event.ChatID),
-			slog.Int(AttrMessageID, event.MessageID),
+			slog.Int64("event_chat_id", event.ChatID),
+			slog.Int("message_id", event.MessageID),
 			slog.Any("err", rollbackErr),
 		)
 	}
