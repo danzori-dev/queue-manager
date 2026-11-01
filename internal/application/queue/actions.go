@@ -30,4 +30,6 @@ const (
 	AttrCount       = "count"
 	AttrPeerUserID  = "peer_user_id"
 	AttrPeerName    = "peer_name"
+	AttrEventChatID = "event_chat_id"
+	AttrMessageID   = "message_id"
 )

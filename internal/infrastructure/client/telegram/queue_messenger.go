@@ -106,9 +106,9 @@ func (m *QueueMessenger) Edit(ctx context.Context, view appqueue.View) (time.Dur
 	return 0, nil
 }
 
-func (m *QueueMessenger) Delete(ctx context.Context, event domain.Event) {
+func (m *QueueMessenger) Delete(ctx context.Context, event domain.Event) error {
 	if event.MessageID == 0 {
-		return
+		return nil
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
@@ -121,12 +121,10 @@ func (m *QueueMessenger) Delete(ctx context.Context, event domain.Event) {
 		},
 	)
 	if err != nil {
-		m.log.WarnContext(
-			ctx, "delete queue message",
-			slog.Int64("event_id", event.ID),
-			slog.Any("err", err),
-		)
+		return fmt.Errorf("delete queue message: %w", err)
 	}
+
+	return nil
 }
 
 func (m *QueueMessenger) AnnounceRemoval(ctx context.Context, removal appqueue.Removal) {

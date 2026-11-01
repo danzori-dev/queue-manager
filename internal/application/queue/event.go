@@ -49,17 +49,19 @@ func (s *Service) CreateEvent(ctx context.Context, actorID int64, title string) 
 
 	messageID, err := s.messages.Publish(ctx, View{Event: event})
 	if err != nil {
-		publishErr := fmt.Errorf("publish event: %w", err)
-
-		if delErr := s.events.Delete(context.WithoutCancel(ctx), event.ID); delErr != nil {
-			return errors.Join(publishErr, fmt.Errorf("delete unpublished event: %w", delErr))
-		}
-
-		return publishErr
+		return errors.Join(
+			fmt.Errorf("publish event: %w", err),
+			s.rollbackCreatedEvent(ctx, event),
+		)
 	}
 
+	event.MessageID = messageID
+
 	if err := s.saveMessageID(ctx, event.ID, messageID); err != nil {
-		return fmt.Errorf("save message id: %w", err)
+		return errors.Join(
+			fmt.Errorf("save message id: %w", err),
+			s.rollbackCreatedEvent(ctx, event),
+		)
 	}
 
 	s.audit(
@@ -145,7 +147,15 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 		return fmt.Errorf("delete event: %w", err)
 	}
 
-	s.messages.Delete(ctx, event)
+	if err := s.messages.Delete(ctx, event); err != nil {
+		s.log.WarnContext(
+			ctx, "delete queue message",
+			slog.Int64(AttrEventID, event.ID),
+			slog.Int64(AttrEventChatID, event.ChatID),
+			slog.Int(AttrMessageID, event.MessageID),
+			slog.Any("err", err),
+		)
+	}
 	s.audit(
 		ctx, actorID, ActionEventDeleted,
 		slog.Int64(AttrEventID, eventID),
