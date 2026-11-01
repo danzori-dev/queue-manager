@@ -30,6 +30,7 @@ type Service struct {
 	swaps     *swapStore
 	invites   *inviteStore
 	throttle  *requestThrottle
+	log       *slog.Logger
 	auditLog  *slog.Logger
 	activity  ActivityRecorder
 }
@@ -45,6 +46,7 @@ func New(d Deps) *Service {
 		swaps:     newSwapStore(),
 		invites:   newInviteStore(),
 		throttle:  newRequestThrottle(d.RequestLimit),
+		log:       d.Log,
 		auditLog:  d.Log.With(slog.Bool("audit", true)),
 		activity:  d.Activity,
 	}

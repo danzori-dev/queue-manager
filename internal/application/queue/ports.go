@@ -46,7 +46,7 @@ type StudentDirectory interface {
 type Messenger interface {
 	Publish(ctx context.Context, view View) (int, error)
 	Edit(ctx context.Context, view View) (time.Duration, error)
-	Delete(ctx context.Context, event domain.Event)
+	Delete(ctx context.Context, event domain.Event) error
 	AnnounceRemoval(ctx context.Context, removal Removal)
 	AskSwap(ctx context.Context, swap Swap) (int, error)
 	AskInvite(ctx context.Context, invite Invite) (int, error)

@@ -153,8 +153,18 @@ func (r *EventRepository) SetMessageID(ctx context.Context, eventID int64, messa
 		WHERE id = ?
 	`
 
-	if _, err := r.db.ExecContext(ctx, query, messageID, eventID); err != nil {
+	result, err := r.db.ExecContext(ctx, query, messageID, eventID)
+	if err != nil {
 		return fmt.Errorf("update event message id: %w", err)
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read affected rows: %w", err)
+	}
+
+	if count == 0 {
+		return domain.ErrEventNotFound
 	}
 
 	return nil
