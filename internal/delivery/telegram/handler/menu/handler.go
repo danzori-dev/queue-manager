@@ -114,6 +114,10 @@ func (h *Handler) Text(ctx *th.Context, msg telego.Message) error {
 	}
 
 	view, err := h.queues.EventView(ctx, eventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return h.reply.SendMenu(ctx, msg, texts.EventGone, keyboard.Back(eventsPage))
+	}
+
 	if err != nil {
 		return err
 	}
@@ -168,7 +172,7 @@ func (h *Handler) showEvents(ctx context.Context, query telego.CallbackQuery, pa
 	}
 
 	if len(events) == 0 {
-		return h.reply.EditMenu(ctx, query, texts.EventsEmpty, nil)
+		return h.reply.EditMenu(ctx, query, texts.EventsEmpty, keyboard.None())
 	}
 
 	kb, p := keyboard.Events(events, page)
@@ -230,7 +234,7 @@ func (h *Handler) rename(ctx context.Context, msg telego.Message, eventID int64,
 		return false, h.reply.SendHTML(ctx, msg, texts.EventTitleTooLong)
 
 	case errors.Is(err, domain.ErrEventNotFound):
-		return false, h.reply.SendHTML(ctx, msg, texts.QueueNotFound)
+		return false, h.reply.SendMenu(ctx, msg, texts.EventGone, keyboard.Back(eventsPage))
 
 	case err != nil:
 		return false, err
@@ -303,7 +307,7 @@ func (h *Handler) kick(ctx context.Context, query telego.CallbackQuery, a callba
 	return text, h.showMembers(ctx, query, a.EventID, a.Page, a.EventsPage)
 }
 
-func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, eventID int64, page int, eventsPage int) error {
+func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, eventID int64, page, eventsPage int) error {
 	view, err := h.queues.EventView(ctx, eventID)
 	if errors.Is(err, domain.ErrEventNotFound) {
 		return h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back(eventsPage))
