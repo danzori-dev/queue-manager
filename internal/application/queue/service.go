@@ -31,7 +31,6 @@ type Service struct {
 	invites   *inviteStore
 	throttle  *requestThrottle
 	log       *slog.Logger
-	auditLog  *slog.Logger
 	activity  ActivityRecorder
 }
 
@@ -47,7 +46,6 @@ func New(d Deps) *Service {
 		invites:   newInviteStore(),
 		throttle:  newRequestThrottle(d.RequestLimit),
 		log:       d.Log,
-		auditLog:  d.Log.With(slog.Bool("audit", true)),
 		activity:  d.Activity,
 	}
 }
@@ -105,6 +103,6 @@ func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
 }
 
 func (s *Service) audit(ctx context.Context, userID int64, action string, attrs ...slog.Attr) {
-	s.auditLog.LogAttrs(ctx, slog.LevelInfo, action, attrs...)
+	s.log.LogAttrs(ctx, slog.LevelInfo, action, attrs...)
 	s.activity.Record(userID, action, attrs)
 }
