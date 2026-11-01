@@ -208,6 +208,9 @@ func (h *Handler) gone(ctx context.Context, query telego.CallbackQuery, err erro
 	case errors.Is(err, domain.ErrInviteForbidden):
 		return texts.InviteNotYours, nil
 
+	case errors.Is(err, domain.ErrInviteProcessing):
+		return texts.InviteProcessing, nil
+
 	case errors.Is(err, domain.ErrInviteNotFound), errors.Is(err, domain.ErrInviteExpired):
 		return "", h.reply.EditMenu(ctx, query, texts.InviteGone, keyboard.None())
 

@@ -8,15 +8,20 @@ import (
 
 const maxActiveInvites = 5
 
+type storedInvite struct {
+	request    domain.InviteRequest
+	processing bool
+}
+
 type inviteStore struct {
 	mu       sync.Mutex
 	nextID   int64
-	requests map[int64]domain.InviteRequest
+	requests map[int64]storedInvite
 }
 
 func newInviteStore() *inviteStore {
 	return &inviteStore{
-		requests: make(map[int64]domain.InviteRequest),
+		requests: make(map[int64]storedInvite),
 	}
 }
 
@@ -26,8 +31,10 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 
 	activeInvites := 0
 
-	for id, r := range s.requests {
-		if r.Expired() {
+	for id, stored := range s.requests {
+		r := stored.request
+
+		if r.Expired() && !stored.processing {
 			delete(s.requests, id)
 
 			continue
@@ -37,7 +44,7 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 			activeInvites++
 		}
 
-		if r.Involves(req.FromID) || r.Involves(req.ToID) {
+		if r.ToID == req.ToID {
 			return domain.InviteRequest{}, domain.ErrInviteBusy
 		}
 	}
@@ -48,7 +55,9 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 
 	s.nextID++
 	req.ID = s.nextID
-	s.requests[s.nextID] = req
+	s.requests[s.nextID] = storedInvite{
+		request: req,
+	}
 
 	return req, nil
 }
@@ -57,9 +66,9 @@ func (s *inviteStore) setMessage(id int64, messageID int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if req, ok := s.requests[id]; ok {
-		req.ToMessageID = messageID
-		s.requests[id] = req
+	if stored, ok := s.requests[id]; ok {
+		stored.request.ToMessageID = messageID
+		s.requests[id] = stored
 	}
 }
 
@@ -70,24 +79,16 @@ func (s *inviteStore) remove(id int64) {
 	delete(s.requests, id)
 }
 
-func (s *inviteStore) restore(req domain.InviteRequest) {
+func (s *inviteStore) begin(id, userID int64, side side) (domain.InviteRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !req.Expired() {
-		s.requests[req.ID] = req
-	}
-}
-
-func (s *inviteStore) take(id, userID int64, side side) (domain.InviteRequest, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	req, ok := s.requests[id]
+	stored, ok := s.requests[id]
 	if !ok {
 		return domain.InviteRequest{}, domain.ErrInviteNotFound
 	}
 
+	req := stored.request
 	allowed := req.FromID
 
 	if side == addressee {
@@ -98,11 +99,48 @@ func (s *inviteStore) take(id, userID int64, side side) (domain.InviteRequest, e
 		return domain.InviteRequest{}, domain.ErrInviteForbidden
 	}
 
-	delete(s.requests, id)
+	if stored.processing {
+		return domain.InviteRequest{}, domain.ErrInviteProcessing
+	}
 
 	if req.Expired() {
+		delete(s.requests, id)
+
 		return req, domain.ErrInviteExpired
 	}
+
+	stored.processing = true
+	s.requests[id] = stored
+
+	return req, nil
+}
+
+func (s *inviteStore) release(id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	stored, ok := s.requests[id]
+	if !ok {
+		return
+	}
+
+	if stored.request.Expired() {
+		delete(s.requests, id)
+
+		return
+	}
+
+	stored.processing = false
+	s.requests[id] = stored
+}
+
+func (s *inviteStore) take(id, userID int64, side side) (domain.InviteRequest, error) {
+	req, err := s.begin(id, userID, side)
+	if err != nil {
+		return domain.InviteRequest{}, err
+	}
+
+	s.remove(id)
 
 	return req, nil
 }
