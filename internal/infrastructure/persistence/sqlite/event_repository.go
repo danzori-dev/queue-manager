@@ -64,7 +64,7 @@ func (r *EventRepository) Get(ctx context.Context, eventID int64) (domain.Event,
 	return event, nil
 }
 
-func (r *EventRepository) ListRecent(ctx context.Context, limit int) ([]domain.Event, error) {
+func (r *EventRepository) List(ctx context.Context) ([]domain.Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
@@ -72,12 +72,11 @@ func (r *EventRepository) ListRecent(ctx context.Context, limit int) ([]domain.E
 		SELECT id, chat_id, thread_id, message_id, title, status
 		FROM events
 		ORDER BY id DESC
-		LIMIT ?
 	`
 
-	events, err := r.queryEvents(ctx, query, limit)
+	events, err := r.queryEvents(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("query recent events: %w", err)
+		return nil, fmt.Errorf("query events: %w", err)
 	}
 
 	return events, nil

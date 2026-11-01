@@ -9,8 +9,6 @@ import (
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
-const recentEventsLimit = 20
-
 func (s *Service) SetQueueTopic(ctx context.Context, chatID int64, threadID int) (bool, error) {
 	_, err := s.targets.Target(ctx)
 	if err != nil && !errors.Is(err, domain.ErrTargetNotSet) {
@@ -112,9 +110,9 @@ func (s *Service) OpenEventIDs(ctx context.Context) ([]int64, error) {
 }
 
 func (s *Service) Events(ctx context.Context) ([]domain.Event, error) {
-	events, err := s.events.ListRecent(ctx, recentEventsLimit)
+	events, err := s.events.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list recent events: %w", err)
+		return nil, fmt.Errorf("list events: %w", err)
 	}
 
 	return events, nil
