@@ -18,7 +18,7 @@ type EventRepository interface {
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	SetTitle(ctx context.Context, eventID int64, title string) error
 	Delete(ctx context.Context, eventID int64) error
-	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
+	DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error)
 }
 
 type EventCache struct {
@@ -165,7 +165,7 @@ func (c *EventCache) Delete(ctx context.Context, eventID int64) error {
 	return err
 }
 
-func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) (int, error) {
+func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -173,10 +173,10 @@ func (c *EventCache) DeleteClosedBefore(ctx context.Context, before time.Time) (
 	if err != nil {
 		clear(c.events)
 
-		return 0, err
+		return nil, err
 	}
 
-	if deleted > 0 {
+	if len(deleted) > 0 {
 		clear(c.events)
 	}
 

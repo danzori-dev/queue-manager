@@ -12,5 +12,5 @@ func (s *Service) CleanupClosedEvents(ctx context.Context, olderThan time.Durati
 		return 0, fmt.Errorf("delete closed events: %w", err)
 	}
 
-	return deleted, nil
+	return len(deleted), nil
 }

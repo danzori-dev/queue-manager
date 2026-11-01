@@ -245,7 +245,7 @@ func (r *EventRepository) Delete(ctx context.Context, eventID int64) error {
 	return nil
 }
 
-func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Time) (int, error) {
+func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
@@ -258,12 +258,13 @@ func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Ti
 		deleteEventsQuery = `
 			DELETE FROM events
 			WHERE status = 'closed' AND closed_at < ?
+			RETURNING id, title
 		`
 	)
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, fmt.Errorf("begin tx: %w", err)
+		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 
 	defer func() {
@@ -271,24 +272,44 @@ func (r *EventRepository) DeleteClosedBefore(ctx context.Context, before time.Ti
 	}()
 
 	if _, err := tx.ExecContext(ctx, deleteEntriesQuery, before.Unix()); err != nil {
-		return 0, fmt.Errorf("delete entries: %w", err)
+		return nil, fmt.Errorf("delete entries: %w", err)
 	}
 
-	res, err := tx.ExecContext(ctx, deleteEventsQuery, before.Unix())
+	rows, err := tx.QueryContext(ctx, deleteEventsQuery, before.Unix())
 	if err != nil {
-		return 0, fmt.Errorf("delete events: %w", err)
+		return nil, fmt.Errorf("delete events: %w", err)
+	}
+	defer rows.Close()
+
+	var events []domain.Event
+
+	for rows.Next() {
+		var (
+			eventID int64
+			title   string
+		)
+
+		if err := rows.Scan(&eventID, &title); err != nil {
+			return nil, fmt.Errorf("scan row: %w", err)
+		}
+
+		events = append(
+			events, domain.Event{
+				ID:    eventID,
+				Title: title,
+			},
+		)
 	}
 
-	deleted, err := res.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("count deleted events: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate rows: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit tx: %w", err)
+		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 
-	return int(deleted), nil
+	return events, nil
 }
 
 func (r *EventRepository) queryEvents(ctx context.Context, query string, args ...any) ([]domain.Event, error) {

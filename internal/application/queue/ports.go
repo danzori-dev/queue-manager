@@ -19,7 +19,7 @@ type EventRepository interface {
 	SetStatus(ctx context.Context, eventID int64, status domain.Status) error
 	SetTitle(ctx context.Context, eventID int64, title string) error
 	Delete(ctx context.Context, eventID int64) error
-	DeleteClosedBefore(ctx context.Context, before time.Time) (int, error)
+	DeleteClosedBefore(ctx context.Context, before time.Time) ([]domain.Event, error)
 }
 
 type EntryRepository interface {
