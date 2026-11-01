@@ -79,7 +79,7 @@ func (s *inviteStore) remove(id int64) {
 	delete(s.requests, id)
 }
 
-func (s *inviteStore) begin(id, userID int64, side side) (domain.InviteRequest, error) {
+func (s *inviteStore) begin(id, userID int64, messageID int, side side) (domain.InviteRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -90,13 +90,23 @@ func (s *inviteStore) begin(id, userID int64, side side) (domain.InviteRequest, 
 
 	req := stored.request
 	allowed := req.FromID
+	expectedMessageID := req.FromMessageID
 
 	if side == addressee {
 		allowed = req.ToID
+		expectedMessageID = req.ToMessageID
 	}
 
 	if allowed != userID {
 		return domain.InviteRequest{}, domain.ErrInviteForbidden
+	}
+
+	if expectedMessageID == 0 {
+		return domain.InviteRequest{}, domain.ErrInviteProcessing
+	}
+
+	if expectedMessageID != messageID {
+		return domain.InviteRequest{}, domain.ErrInviteNotFound
 	}
 
 	if stored.processing {
@@ -134,8 +144,8 @@ func (s *inviteStore) release(id int64) {
 	s.requests[id] = stored
 }
 
-func (s *inviteStore) take(id, userID int64, side side) (domain.InviteRequest, error) {
-	req, err := s.begin(id, userID, side)
+func (s *inviteStore) take(id, userID int64, messageID int, side side) (domain.InviteRequest, error) {
+	req, err := s.begin(id, userID, messageID, side)
 	if err != nil {
 		return domain.InviteRequest{}, err
 	}

@@ -123,8 +123,8 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 	return invite, nil
 }
 
-func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, username string) (Invite, error) {
-	req, err := s.invites.begin(requestID, userID, addressee)
+func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, username string, messageID int) (Invite, error) {
+	req, err := s.invites.begin(requestID, userID, messageID, addressee)
 	if err != nil {
 		return Invite{}, err
 	}
@@ -178,8 +178,8 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 	return invite, nil
 }
 
-func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
-	req, err := s.invites.take(requestID, userID, addressee)
+func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64, messageID int) (Invite, error) {
+	req, err := s.invites.take(requestID, userID, messageID, addressee)
 	if err != nil {
 		return Invite{}, err
 	}
@@ -197,8 +197,8 @@ func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (I
 	return invite, nil
 }
 
-func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
-	req, err := s.invites.take(requestID, userID, initiator)
+func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64, messageID int) (Invite, error) {
+	req, err := s.invites.take(requestID, userID, messageID, initiator)
 	if err != nil {
 		return Invite{}, err
 	}
