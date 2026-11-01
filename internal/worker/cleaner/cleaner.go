@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/danzori-dev/queue-manager/internal/infrastructure/observability/logctx"
 )
 
 const firstRunDelay = time.Minute
@@ -46,6 +48,8 @@ func (w *Worker) Run(ctx context.Context, c Cleaner) error {
 }
 
 func (w *Worker) cleanup(ctx context.Context, c Cleaner) {
+	ctx = logctx.WithOp(ctx, "cleanup")
+
 	deleted, err := c.CleanupClosedEvents(ctx, w.cfg.Retention)
 	if err != nil {
 		if ctx.Err() != nil {
