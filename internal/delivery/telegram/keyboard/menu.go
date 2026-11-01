@@ -12,10 +12,11 @@ import (
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
 
-func Events(events []domain.Event) *telego.InlineKeyboardMarkup {
-	rows := make([][]telego.InlineKeyboardButton, 0, len(events))
+func Events(events []domain.Event, requested int) (*telego.InlineKeyboardMarkup, Page) {
+	p := paginate(len(events), requested, pageSize)
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+1)
 
-	for _, e := range events {
+	for _, e := range events[p.start:p.end] {
 		label := fmt.Sprintf("#%d %s", e.ID, e.Title)
 		if e.Status == domain.StatusClosed {
 			label = "🔒 " + label
@@ -25,15 +26,25 @@ func Events(events []domain.Event) *telego.InlineKeyboardMarkup {
 			rows, tu.InlineKeyboardRow(
 				button(
 					label, callback.Action{
-						Kind:    callback.ActionMenu,
-						EventID: e.ID,
+						Kind:       callback.ActionMenu,
+						EventID:    e.ID,
+						EventsPage: p.Index,
 					},
 				),
 			),
 		)
 	}
 
-	return tu.InlineKeyboard(rows...)
+	rows = appendPageRow(
+		rows, p, func(index int) callback.Action {
+			return callback.Action{
+				Kind: callback.ActionList,
+				Page: index,
+			}
+		},
+	)
+
+	return tu.InlineKeyboard(rows...), p
 }
 
 func Menu(view appqueue.View) *telego.InlineKeyboardMarkup {

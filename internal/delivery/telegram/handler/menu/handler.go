@@ -52,7 +52,9 @@ func (h *Handler) Events(ctx *th.Context, msg telego.Message) error {
 		return h.reply.SendHTML(ctx, msg, texts.EventsEmpty)
 	}
 
-	return h.reply.SendMenu(ctx, msg, texts.EventsTitle, keyboard.Events(events))
+	kb, p := keyboard.Events(events, 0)
+
+	return h.reply.SendMenu(ctx, msg, texts.EventsTitle(p.Index, p.Count), kb)
 }
 
 func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
@@ -122,7 +124,7 @@ func (h *Handler) Text(ctx *th.Context, msg telego.Message) error {
 func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
 	switch a.Kind {
 	case callback.ActionList:
-		return "", h.showEvents(ctx, query)
+		return "", h.showEvents(ctx, query, a.Page)
 
 	case callback.ActionMenu, callback.ActionRenameCancel:
 		return "", h.showMenu(ctx, query, a.EventID)
@@ -159,7 +161,7 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	}
 }
 
-func (h *Handler) showEvents(ctx context.Context, query telego.CallbackQuery) error {
+func (h *Handler) showEvents(ctx context.Context, query telego.CallbackQuery, page int) error {
 	events, err := h.queues.Events(ctx)
 	if err != nil {
 		return err
@@ -169,7 +171,9 @@ func (h *Handler) showEvents(ctx context.Context, query telego.CallbackQuery) er
 		return h.reply.EditMenu(ctx, query, texts.EventsEmpty, nil)
 	}
 
-	return h.reply.EditMenu(ctx, query, texts.EventsTitle, keyboard.Events(events))
+	kb, p := keyboard.Events(events, page)
+
+	return h.reply.EditMenu(ctx, query, texts.EventsTitle(p.Index, p.Count), kb)
 }
 
 func (h *Handler) showMenu(ctx context.Context, query telego.CallbackQuery, eventID int64) error {
