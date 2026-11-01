@@ -58,7 +58,7 @@ func (s *Service) CreateEvent(ctx context.Context, actorID int64, title string) 
 		return publishErr
 	}
 
-	if err := s.events.SetMessageID(ctx, event.ID, messageID); err != nil {
+	if err := s.saveMessageID(ctx, event.ID, messageID); err != nil {
 		return fmt.Errorf("save message id: %w", err)
 	}
 
