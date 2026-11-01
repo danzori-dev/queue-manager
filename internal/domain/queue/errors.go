@@ -28,6 +28,7 @@ var (
 	ErrInviteSelf        = errors.New("cannot invite yourself")
 	ErrInviteBusy        = errors.New("invite already pending")
 	ErrTooManyInvites    = errors.New("too many active invite requests")
+	ErrInviteProcessing  = errors.New("invite is being processed")
 	ErrInviteNotFound    = errors.New("invite not found")
 	ErrInviteExpired     = errors.New("invite expired")
 	ErrInviteChanged     = errors.New("invite left the queue")

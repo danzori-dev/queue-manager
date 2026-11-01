@@ -151,7 +151,7 @@ func (h *Handler) send(ctx context.Context, query telego.CallbackQuery, eventID,
 }
 
 func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
-	inv, err := h.invites.AcceptInvite(ctx, requestID, query.From.ID, query.From.Username)
+	inv, err := h.invites.AcceptInvite(ctx, requestID, query.From.ID, query.From.Username, query.Message.GetMessageID())
 
 	switch {
 	case errors.Is(err, domain.ErrInviteChanged):
@@ -181,7 +181,7 @@ func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, reques
 }
 
 func (h *Handler) decline(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
-	inv, err := h.invites.DeclineInvite(ctx, requestID, query.From.ID)
+	inv, err := h.invites.DeclineInvite(ctx, requestID, query.From.ID, query.Message.GetMessageID())
 	if err != nil {
 		return h.gone(ctx, query, err)
 	}
@@ -193,7 +193,7 @@ func (h *Handler) decline(ctx context.Context, query telego.CallbackQuery, reque
 }
 
 func (h *Handler) cancel(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {
-	inv, err := h.invites.CancelInvite(ctx, requestID, query.From.ID)
+	inv, err := h.invites.CancelInvite(ctx, requestID, query.From.ID, query.Message.GetMessageID())
 	if err != nil {
 		return h.gone(ctx, query, err)
 	}
@@ -207,6 +207,9 @@ func (h *Handler) gone(ctx context.Context, query telego.CallbackQuery, err erro
 	switch {
 	case errors.Is(err, domain.ErrInviteForbidden):
 		return texts.InviteNotYours, nil
+
+	case errors.Is(err, domain.ErrInviteProcessing):
+		return texts.InviteProcessing, nil
 
 	case errors.Is(err, domain.ErrInviteNotFound), errors.Is(err, domain.ErrInviteExpired):
 		return "", h.reply.EditMenu(ctx, query, texts.InviteGone, keyboard.None())
@@ -250,6 +253,9 @@ func errorText(err error) (string, bool) {
 
 	case errors.Is(err, domain.ErrInviteBusy):
 		return texts.InviteBusy, true
+
+	case errors.Is(err, domain.ErrTooManyInvites):
+		return texts.InviteTooManyInvites, true
 
 	case errors.Is(err, domain.ErrRequestsTooOften):
 		return texts.RequestsTooOften(domain.RetryAfter(err)), true

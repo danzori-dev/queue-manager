@@ -123,17 +123,18 @@ func (s *Service) RequestInvite(ctx context.Context, eventID, fromID, toID int64
 	return invite, nil
 }
 
-func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, username string) (Invite, error) {
-	req, err := s.invites.take(requestID, userID, addressee)
+func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, username string, messageID int) (Invite, error) {
+	req, err := s.invites.begin(requestID, userID, messageID, addressee)
 	if err != nil {
 		return Invite{}, err
 	}
+	defer s.invites.release(req.ID)
 
 	invite := s.namedInvite(req)
 
 	if _, err := s.loadOpenEvent(ctx, req.Event.ID); err != nil {
-		if !errors.Is(err, domain.ErrEventClosed) && !errors.Is(err, domain.ErrEventNotFound) {
-			s.invites.restore(req)
+		if errors.Is(err, domain.ErrEventClosed) || errors.Is(err, domain.ErrEventNotFound) {
+			s.invites.remove(req.ID)
 		}
 
 		return invite, err
@@ -143,17 +144,20 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 
 	switch {
 	case errors.Is(err, domain.ErrNotInQueue):
+		s.invites.remove(req.ID)
+
 		return invite, domain.ErrInviteChanged
 
 	case errors.Is(err, domain.ErrPlaceFull), errors.Is(err, domain.ErrAlreadyOnPlace):
+		s.invites.remove(req.ID)
+
 		return invite, err
 
 	case err != nil:
-		s.invites.restore(req)
-
 		return invite, fmt.Errorf("join place: %w", err)
 	}
 
+	s.invites.remove(req.ID)
 	s.scheduler.Schedule(req.Event.ID)
 
 	pos, err := s.entries.Position(ctx, req.Event.ID, req.FromID)
@@ -174,8 +178,8 @@ func (s *Service) AcceptInvite(ctx context.Context, requestID, userID int64, use
 	return invite, nil
 }
 
-func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
-	req, err := s.invites.take(requestID, userID, addressee)
+func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64, messageID int) (Invite, error) {
+	req, err := s.invites.take(requestID, userID, messageID, addressee)
 	if err != nil {
 		return Invite{}, err
 	}
@@ -193,8 +197,8 @@ func (s *Service) DeclineInvite(ctx context.Context, requestID, userID int64) (I
 	return invite, nil
 }
 
-func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64) (Invite, error) {
-	req, err := s.invites.take(requestID, userID, initiator)
+func (s *Service) CancelInvite(ctx context.Context, requestID, userID int64, messageID int) (Invite, error) {
+	req, err := s.invites.take(requestID, userID, messageID, initiator)
 	if err != nil {
 		return Invite{}, err
 	}
