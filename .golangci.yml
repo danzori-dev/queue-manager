@@ -60,6 +60,7 @@ linters:
                 - hugeParam
                 - rangeValCopy
                 - importShadow
+                - unnamedResult
 
         gosec:
             excludes:

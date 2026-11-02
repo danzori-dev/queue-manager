@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	EventsTitle = "<b>Очереди</b>\nВыбери очередь, чтобы управлять ей."
 	EventsEmpty = "Очередей нет."
 	EventGone   = "Эта очередь уже удалена."
 
@@ -39,6 +38,10 @@ const (
 
 	queueEmpty = "В очереди никого нет."
 )
+
+func EventsTitle(page, pages int) string {
+	return "<b>Очереди</b>\nВыбери очередь, чтобы управлять ей." + pageLine(page, pages)
+}
 
 func EventMenu(view appqueue.View) string {
 	var b strings.Builder

@@ -8,8 +8,9 @@ import (
 const renameTTL = 5 * time.Minute
 
 type pendingRename struct {
-	eventID   int64
-	createdAt time.Time
+	eventID    int64
+	eventsPage int
+	createdAt  time.Time
 }
 
 type renames struct {
@@ -23,32 +24,33 @@ func newRenames() *renames {
 	}
 }
 
-func (r *renames) Put(adminID, eventID int64) {
+func (r *renames) Put(adminID, eventID int64, eventsPage int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.pending[adminID] = pendingRename{
-		eventID:   eventID,
-		createdAt: time.Now(),
+		eventID:    eventID,
+		eventsPage: eventsPage,
+		createdAt:  time.Now(),
 	}
 }
 
-func (r *renames) Take(adminID int64) (int64, bool) {
+func (r *renames) Take(adminID int64) (int64, int, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	p, ok := r.pending[adminID]
 	if !ok {
-		return 0, false
+		return 0, 0, false
 	}
 
 	delete(r.pending, adminID)
 
 	if time.Since(p.createdAt) > renameTTL {
-		return 0, false
+		return 0, 0, false
 	}
 
-	return p.eventID, true
+	return p.eventID, p.eventsPage, true
 }
 
 func (r *renames) Drop(adminID int64) {

@@ -12,7 +12,7 @@ import (
 type EventRepository interface {
 	Create(ctx context.Context, event domain.Event) (int64, error)
 	Get(ctx context.Context, eventID int64) (domain.Event, error)
-	ListRecent(ctx context.Context, limit int) ([]domain.Event, error)
+	List(ctx context.Context) ([]domain.Event, error)
 	ListOpenIDs(ctx context.Context) ([]int64, error)
 	ListOpenWithUser(ctx context.Context, userID int64) ([]domain.Event, error)
 	SetMessageID(ctx context.Context, eventID int64, messageID int) error
