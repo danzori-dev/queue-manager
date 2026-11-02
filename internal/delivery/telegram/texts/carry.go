@@ -19,7 +19,8 @@ const (
 
 	ButtonCarry = "Перенести"
 
-	CarryExpired    = "Время на подтверждение вышло. Отправь /carry ещё раз."
+	CarryExpired    = "Меню переноса устарело. Отправь /carry ещё раз."
+	CarryProcessing = "Предыдущее действие еще обрабатывается."
 	CarryCanceled   = "Перенос отменён."
 	CarryDoneAnswer = "Готово. Перенос выполнен."
 )
@@ -58,7 +59,7 @@ func CarryPlan(plan appqueue.CarryPlan, lines []appqueue.Line, page int, pages i
 			names[i] = html.EscapeString(line.Name)
 		}
 
-		fmt.Sprintf("\n%d. %s", place[0].Position, strings.Join(names, ", "))
+		fmt.Fprintf(&b, "\n%d. %s", place[0].Position, strings.Join(names, ", "))
 	}
 
 	b.WriteString(pageLine(page, pages))

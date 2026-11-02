@@ -184,7 +184,7 @@ func CarryCancel(fromID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func Carry(plan appqueue.CarryPlan, targetPage, requested int) (*telego.InlineKeyboardMarkup, Page) {
+func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID int64) (*telego.InlineKeyboardMarkup, Page) {
 	var (
 		fromPos    int
 		placeCount int
@@ -201,9 +201,10 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int) (*telego.InlineKe
 	rows = appendPageRow(
 		rows, p, func(index int) callback.Action {
 			return callback.Action{
-				Kind:    callback.ActionCarryPlanPage,
-				EventID: plan.To.ID,
-				Page:    index,
+				Kind:           callback.ActionCarryPlanPage,
+				EventID:        plan.To.ID,
+				Page:           index,
+				ConfirmationID: confirmationID,
 			}
 		},
 	)
@@ -212,14 +213,16 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int) (*telego.InlineKe
 		rows, tu.InlineKeyboardRow(
 			button(
 				texts.ButtonCarry, callback.Action{
-					Kind:    callback.ActionCarry,
-					EventID: plan.From.ID,
+					Kind:           callback.ActionCarry,
+					EventID:        plan.From.ID,
+					ConfirmationID: confirmationID,
 				},
 			).WithStyle(telego.ButtonStyleSuccess),
 			button(
 				texts.ButtonCancel, callback.Action{
-					Kind:    callback.ActionCarryCancel,
-					EventID: plan.From.ID,
+					Kind:           callback.ActionCarryCancel,
+					EventID:        plan.From.ID,
+					ConfirmationID: confirmationID,
 				},
 			).WithStyle(telego.ButtonStyleDanger),
 		),
@@ -229,10 +232,11 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int) (*telego.InlineKe
 		rows, tu.InlineKeyboardRow(
 			button(
 				texts.ButtonBack, callback.Action{
-					Kind:     callback.ActionCarryTargetsPage,
-					EventID:  plan.From.ID,
-					Position: fromPos,
-					Page:     targetPage,
+					Kind:           callback.ActionCarryTargetsPage,
+					EventID:        plan.From.ID,
+					Position:       fromPos,
+					Page:           targetPage,
+					ConfirmationID: confirmationID,
 				},
 			),
 		),

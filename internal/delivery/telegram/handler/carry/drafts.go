@@ -1,6 +1,7 @@
 package carry
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -9,14 +10,26 @@ import (
 
 const carryDraftTTL = 5 * time.Minute
 
+var (
+	errCarryExpired    = errors.New("carry draft expired")
+	errCarryProcessing = errors.New("carry draft is being processed")
+)
+
 type carryDraft struct {
-	fromID      int64
-	fromPos     int
-	toID        int64
+	fromID  int64
+	fromPos int
+	toID    int64
+
 	targetsPage int
 	sourcesPage int
-	plan        *appqueue.CarryPlan
-	createdAt   time.Time
+
+	chatID         int64
+	messageID      int
+	confirmationID int64
+
+	plan       *appqueue.CarryPlan
+	createdAt  time.Time
+	processing bool
 }
 
 type carryDrafts struct {
@@ -30,184 +43,87 @@ func newCarryDrafts() *carryDrafts {
 	}
 }
 
-func (d *carryDrafts) Get(adminID int64) (carryDraft, bool) {
+func (d *carryDrafts) Start(adminID, chatID int64) (carryDraft, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if current, ok := d.drafts[adminID]; ok && current.processing {
+		return carryDraft{}, errCarryProcessing
+	}
+
+	draft := carryDraft{
+		chatID:     chatID,
+		createdAt:  time.Now(),
+		processing: true,
+	}
+
+	d.drafts[adminID] = draft
+
+	return draft, nil
+}
+
+func (d *carryDrafts) Begin(adminID, chatID int64, messageID int, confirmationID int64) (carryDraft, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	draft, ok := d.drafts[adminID]
 	if !ok {
-		return carryDraft{}, false
+		return carryDraft{}, errCarryExpired
+	}
+
+	if draft.chatID != chatID || draft.messageID != messageID {
+		return carryDraft{}, errCarryExpired
+	}
+
+	if draft.processing {
+		return carryDraft{}, errCarryProcessing
 	}
 
 	if time.Since(draft.createdAt) > carryDraftTTL {
 		delete(d.drafts, adminID)
 
-		return carryDraft{}, false
+		return carryDraft{}, errCarryExpired
 	}
 
-	return draft, true
-}
+	if confirmationID != 0 && draft.confirmationID != confirmationID {
+		return carryDraft{}, errCarryExpired
+	}
 
-func (d *carryDrafts) Put(adminID int64, draft carryDraft) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	draft.createdAt = time.Now()
+	draft.processing = true
 	d.drafts[adminID] = draft
+
+	return draft, nil
 }
 
-func (d *carryDrafts) SetSourcesPage(adminID int64, page int) bool {
+func (d *carryDrafts) Save(adminID int64, draft carryDraft) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok {
-		return false
-	}
 
 	if time.Since(draft.createdAt) > carryDraftTTL {
 		delete(d.drafts, adminID)
 
-		return false
+		return
 	}
 
-	draft.sourcesPage = page
+	draft.processing = false
 	d.drafts[adminID] = draft
-
-	return true
 }
 
-func (d *carryDrafts) SetPlan(adminID int64, fromPos int, plan appqueue.CarryPlan) (carryDraft, bool) {
+func (d *carryDrafts) Delete(adminID int64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok {
-		return carryDraft{}, false
-	}
-
-	if time.Since(draft.createdAt) > carryDraftTTL {
-		delete(d.drafts, adminID)
-
-		return carryDraft{}, false
-	}
-
-	if draft.fromID != plan.From.ID || draft.fromPos != fromPos {
-		return carryDraft{}, false
-	}
-
-	if len(plan.Lines) == 0 {
-		return carryDraft{}, false
-	}
-
-	draft.toID = plan.To.ID
-	draft.plan = &plan
-	d.drafts[adminID] = draft
-
-	return draft, true
-}
-
-func (d *carryDrafts) Take(adminID, fromID int64) (carryDraft, bool) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok || draft.fromID != fromID {
-		return carryDraft{}, false
-	}
 
 	delete(d.drafts, adminID)
-
-	if time.Since(draft.createdAt) > carryDraftTTL {
-		return carryDraft{}, false
-	}
-
-	return draft, true
 }
 
-func (d *carryDrafts) TakePlan(adminID, fromID int64) (carryDraft, bool) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok || draft.fromID != fromID {
-		return carryDraft{}, false
-	}
-
-	if time.Since(draft.createdAt) > carryDraftTTL {
-		delete(d.drafts, adminID)
-
-		return carryDraft{}, false
-	}
-
-	if draft.plan == nil {
-		return carryDraft{}, false
-	}
-
-	if draft.fromPos < 1 || draft.toID == 0 {
-		return carryDraft{}, false
-	}
-
-	delete(d.drafts, adminID)
-
-	return draft, true
+func (d *carryDraft) resetPlan() {
+	d.toID = 0
+	d.plan = nil
+	d.confirmationID++
 }
 
-func (d *carryDrafts) SelectSource(adminID, fromID int64) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok {
-		return false
-	}
-
-	if time.Since(draft.createdAt) > carryDraftTTL {
-		delete(d.drafts, adminID)
-
-		return false
-	}
-
-	if draft.fromID != fromID {
-		draft.fromID = fromID
-		draft.fromPos = 0
-		draft.toID = 0
-		draft.targetsPage = 0
-		draft.plan = nil
-
-		d.drafts[adminID] = draft
-	}
-
-	return true
-}
-
-func (d *carryDrafts) SelectPlace(adminID, fromID int64, fromPos, targetsPage int) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	draft, ok := d.drafts[adminID]
-	if !ok {
-		return false
-	}
-
-	if time.Since(draft.createdAt) > carryDraftTTL {
-		delete(d.drafts, adminID)
-
-		return false
-	}
-
-	if draft.fromID != fromID {
-		return false
-	}
-
-	if draft.fromPos != fromPos {
-		draft.fromPos = fromPos
-		draft.toID = 0
-		draft.plan = nil
-	}
-
-	draft.targetsPage = targetsPage
-	d.drafts[adminID] = draft
-
-	return true
+func (d *carryDraft) setPlan(plan appqueue.CarryPlan) {
+	d.toID = plan.To.ID
+	d.plan = &plan
+	d.confirmationID++
 }

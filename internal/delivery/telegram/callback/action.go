@@ -55,16 +55,17 @@ const (
 )
 
 type Action struct {
-	Kind       ActionKind
-	EventID    int64
-	UserID     int64
-	Page       int
-	EventsPage int
-	Position   int
+	Kind           ActionKind
+	EventID        int64
+	UserID         int64
+	Page           int
+	EventsPage     int
+	Position       int
+	ConfirmationID int64
 }
 
 func (a Action) String() string {
-	fields := []int64{a.EventID, a.UserID, int64(a.Page), int64(a.EventsPage), int64(a.Position)}
+	fields := []int64{a.EventID, a.UserID, int64(a.Page), int64(a.EventsPage), int64(a.Position), a.ConfirmationID}
 
 	for len(fields) > 1 && fields[len(fields)-1] == 0 {
 		fields = fields[:len(fields)-1]
@@ -85,11 +86,11 @@ func ParseAction(s string) (Action, error) {
 	kind, rest, _ := strings.Cut(s, ":")
 	raw := strings.Split(rest, ":")
 
-	if kind == "" || len(raw) > 5 {
+	if kind == "" || len(raw) > 6 {
 		return Action{}, ErrUnknownAction
 	}
 
-	var fields [5]int64
+	var fields [6]int64
 
 	for i, r := range raw {
 		v, err := strconv.ParseInt(r, 10, 64)
@@ -101,11 +102,12 @@ func ParseAction(s string) (Action, error) {
 	}
 
 	return Action{
-		Kind:       ActionKind(kind),
-		EventID:    fields[0],
-		UserID:     fields[1],
-		Page:       int(fields[2]),
-		EventsPage: int(fields[3]),
-		Position:   int(fields[4]),
+		Kind:           ActionKind(kind),
+		EventID:        fields[0],
+		UserID:         fields[1],
+		Page:           int(fields[2]),
+		EventsPage:     int(fields[3]),
+		Position:       int(fields[4]),
+		ConfirmationID: fields[5],
 	}, nil
 }
