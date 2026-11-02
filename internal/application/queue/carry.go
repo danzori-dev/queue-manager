@@ -2,12 +2,75 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
+
+func (s *Service) CarrySources(ctx context.Context) ([]domain.Event, error) {
+	events, err := s.events.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list events: %w", err)
+	}
+
+	events = slices.DeleteFunc(
+		events, func(e domain.Event) bool {
+			return e.Status != domain.StatusClosed
+		},
+	)
+
+	return events, nil
+}
+
+func (s *Service) CarrySource(ctx context.Context, fromID int64) (View, error) {
+	event, err := s.events.Get(ctx, fromID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return View{}, err
+	}
+
+	if err != nil {
+		return View{}, fmt.Errorf("get event: %w", err)
+	}
+
+	if event.Status != domain.StatusClosed {
+		return View{}, domain.ErrCarrySourceOpen
+	}
+
+	return s.view(ctx, event)
+}
+
+func (s *Service) CarryTargets(ctx context.Context, fromID int64, fromPos int) ([]domain.Event, error) {
+	view, err := s.CarrySource(ctx, fromID)
+	if err != nil {
+		return nil, fmt.Errorf("get carry source: %w", err)
+	}
+
+	hasPosition := slices.ContainsFunc(
+		view.Lines, func(line Line) bool {
+			return line.Position == fromPos
+		},
+	)
+
+	if !hasPosition {
+		return nil, domain.ErrCarryPosition
+	}
+
+	events, err := s.events.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list events: %w", err)
+	}
+
+	events = slices.DeleteFunc(
+		events, func(e domain.Event) bool {
+			return e.Status != domain.StatusOpen
+		},
+	)
+
+	return events, nil
+}
 
 func (s *Service) PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (CarryPlan, error) {
 	c, err := s.carry(ctx, fromID, fromPos, toID)
