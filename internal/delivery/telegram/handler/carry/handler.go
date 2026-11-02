@@ -251,17 +251,33 @@ func (h *Handler) confirm(ctx context.Context, query telego.CallbackQuery, draft
 		return texts.CarryExpired, nil
 	}
 
-	defer h.carries.Delete(query.From.ID)
+	moved, err := h.queues.Carry(ctx, *draft.plan, query.From.ID)
+	if errors.Is(err, domain.ErrCarryChanged) {
+		toID := draft.toID
 
-	moved, err := h.queues.Carry(ctx, draft.fromID, draft.fromPos, draft.toID, query.From.ID)
+		draft.resetPlan()
+
+		err = h.showPlan(ctx, query, draft, toID)
+		h.carries.Save(query.From.ID, *draft)
+
+		return texts.CarryChanged, err
+	}
+
 	if err != nil {
 		text, known := errorText(err)
-		if !known {
-			return "", err
+		if known {
+			err = h.stepFailed(ctx, query, draft, err)
+			h.carries.Save(query.From.ID, *draft)
+
+			return text, err
 		}
 
-		return text, h.reply.EditMenu(ctx, query, text, keyboard.None())
+		h.carries.Delete(query.From.ID)
+
+		return "", err
 	}
+
+	defer h.carries.Delete(query.From.ID)
 
 	return texts.CarryDoneAnswer, h.reply.EditMenu(ctx, query, texts.Carried(moved), keyboard.None())
 }

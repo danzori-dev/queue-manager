@@ -85,25 +85,36 @@ func (s *Service) PlanCarry(ctx context.Context, fromID int64, fromPos int, toID
 	}, nil
 }
 
-func (s *Service) Carry(ctx context.Context, fromID int64, fromPos int, toID, actorID int64) (int, error) {
-	c, err := s.carry(ctx, fromID, fromPos, toID)
+func (s *Service) Carry(ctx context.Context, plan CarryPlan, actorID int64) (int, error) {
+	if len(plan.Lines) == 0 {
+		return 0, domain.ErrCarryPosition
+	}
+
+	places := make([][]int64, 0)
+
+	for i, line := range plan.Lines {
+		if i == 0 || line.Position != plan.Lines[i-1].Position {
+			places = append(places, nil)
+		}
+
+		last := len(places) - 1
+		places[last] = append(places[last], line.UserID)
+	}
+
+	moved, err := s.entries.Prepend(ctx, plan.From.ID, plan.To.ID, plan.Lines[0].Position, places)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("prepend carry entries: %w", err)
 	}
 
-	if err := s.entries.Prepend(ctx, c.to.ID, c.entries); err != nil {
-		return 0, fmt.Errorf("prepend entries: %w", err)
-	}
-
-	s.scheduler.Schedule(c.to.ID)
+	s.scheduler.Schedule(plan.To.ID)
 	s.audit(
 		ctx, actorID, ActionEventCarriedOver,
-		slog.Int64(AttrFromEventID, c.from.ID),
-		slog.Int64(AttrToEventID, c.to.ID),
-		slog.Int(AttrCount, len(c.entries)),
+		slog.Int64(AttrFromEventID, plan.From.ID),
+		slog.Int64(AttrToEventID, plan.To.ID),
+		slog.Int(AttrCount, moved),
 	)
 
-	return len(c.entries), nil
+	return moved, nil
 }
 
 type carryInput struct {

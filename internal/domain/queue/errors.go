@@ -18,6 +18,7 @@ var (
 	ErrCarrySourceOpen   = errors.New("source event is still open")
 	ErrCarryTargetClosed = errors.New("target event is closed")
 	ErrCarryPosition     = errors.New("no such position in the source event")
+	ErrCarryChanged      = errors.New("carry plan changed")
 	ErrSwapSelf          = errors.New("cannot swap with yourself")
 	ErrSwapSamePlace     = errors.New("user already share a place")
 	ErrSwapBusy          = errors.New("swap request already pending")
