@@ -4,6 +4,7 @@ const (
 	ActionQueueJoined        = "queue joined"
 	ActionQueueLeft          = "queue left"
 	ActionQueuePlaceSkipped  = "queue place skipped"
+	ActionParticipantAdded   = "participant added"
 	ActionParticipantRemoved = "participant removed"
 	ActionEventCreated       = "event created"
 	ActionEventRenamed       = "event renamed"
@@ -28,6 +29,7 @@ const (
 	AttrTitle       = "title"
 	AttrPosition    = "position"
 	AttrCount       = "count"
+	AttrActorID     = "actor_id"
 	AttrPeerUserID  = "peer_user_id"
 	AttrPeerName    = "peer_name"
 )

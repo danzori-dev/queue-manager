@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrEmptyList = errors.New("student list is empty")
-	ErrInvalidID = errors.New("student id must be positive")
-	ErrEmptyName = errors.New("student name is empty")
+	ErrEmptyList       = errors.New("student list is empty")
+	ErrInvalidID       = errors.New("student id must be positive")
+	ErrEmptyName       = errors.New("student name is empty")
+	ErrStudentNotFound = errors.New("student not found")
 )
 
 type Student struct {
