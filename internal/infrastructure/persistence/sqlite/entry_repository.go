@@ -203,9 +203,13 @@ func (r *EntryRepository) SwapWithNext(ctx context.Context, eventID, userID int6
 	return nil
 }
 
-func (r *EntryRepository) Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error {
+func (r *EntryRepository) Prepend(ctx context.Context, fromID, toID int64, fromPos int, expected [][]int64) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
+
+	if fromPos < 1 || len(expected) == 0 {
+		return 0, domain.ErrCarryPosition
+	}
 
 	const (
 		minKeyQuery = `
@@ -223,38 +227,70 @@ func (r *EntryRepository) Prepend(ctx context.Context, eventID int64, entries []
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return 0, fmt.Errorf("begin carry tx: %w", err)
 	}
 
 	defer func() {
 		_ = tx.Rollback()
 	}()
 
-	var minKey int64
-
-	err = tx.
-		QueryRowContext(ctx, minKeyQuery, eventID).
-		Scan(&minKey)
+	from, err := carryEventInTx(ctx, tx, fromID)
 	if err != nil {
-		return fmt.Errorf("query min sort key: %w", err)
+		return 0, fmt.Errorf("get carry source: %w", err)
+	}
+
+	to, err := carryEventInTx(ctx, tx, toID)
+	if err != nil {
+		return 0, fmt.Errorf("get carry target: %w", err)
+	}
+
+	if err := domain.CanCarry(from, to); err != nil {
+		return 0, err
+	}
+
+	entries, err := carryEntriesInTx(ctx, tx, fromID)
+	if err != nil {
+		return 0, err
 	}
 
 	places := domain.Places(entries)
-	first := minKey - int64(len(places))
 
-	for i, place := range places {
-		for _, e := range place {
-			if _, err := tx.ExecContext(ctx, upsertQuery, eventID, e.UserID, e.Username, first+int64(i)); err != nil {
-				return fmt.Errorf("upsert entry: %w", err)
+	if fromPos > len(places) {
+		return 0, domain.ErrCarryChanged
+	}
+
+	selected := places[fromPos-1:]
+
+	if !sameCarryPlaces(selected, expected) {
+		return 0, domain.ErrCarryChanged
+	}
+
+	var minKey int64
+
+	err = tx.QueryRowContext(ctx, minKeyQuery, toID).Scan(&minKey)
+	if err != nil {
+		return 0, fmt.Errorf("query carry target min sort key: %w", err)
+	}
+
+	first := minKey - int64(len(selected))
+	moved := 0
+
+	for i, place := range selected {
+		for _, entry := range place {
+			_, err := tx.ExecContext(ctx, upsertQuery, toID, entry.UserID, entry.Username, first+int64(i))
+			if err != nil {
+				return 0, fmt.Errorf("upsert carry entry: %w", err)
 			}
+
+			moved++
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit tx: %w", err)
+		return 0, fmt.Errorf("commit tx: %w", err)
 	}
 
-	return nil
+	return moved, nil
 }
 
 func (r *EntryRepository) SwapSortKeys(ctx context.Context, eventID, userA, userB int64) error {
@@ -392,6 +428,87 @@ func (r *EntryRepository) JoinPlace(ctx context.Context, eventID, userID int64, 
 	}
 
 	return nil
+}
+
+func carryEventInTx(ctx context.Context, tx *sql.Tx, eventID int64) (domain.Event, error) {
+	const query = `
+		SELECT status
+		FROM events
+		WHERE id = ?
+	`
+
+	event := domain.Event{ID: eventID}
+
+	err := tx.QueryRowContext(ctx, query, eventID).Scan(&event.Status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Event{}, domain.ErrEventNotFound
+	}
+
+	if err != nil {
+		return domain.Event{}, fmt.Errorf("query carry event: %w", err)
+	}
+
+	return event, nil
+}
+
+func carryEntriesInTx(ctx context.Context, tx *sql.Tx, eventID int64) ([]domain.Entry, error) {
+	const query = `
+		SELECT user_id, username, sort_key
+		FROM queue_entries
+		WHERE event_id = ?
+		ORDER BY sort_key, id
+	`
+
+	rows, err := tx.QueryContext(ctx, query, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("query carry source entries: %w", err)
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var entries []domain.Entry
+
+	for rows.Next() {
+		var entry domain.Entry
+
+		if err := rows.Scan(&entry.UserID, &entry.Username, &entry.SortKey); err != nil {
+			return nil, fmt.Errorf("scan carry source entry: %w", err)
+		}
+
+		entries = append(entries, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate carry source entries: %w", err)
+	}
+
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close carry source entries: %w", err)
+	}
+
+	return entries, nil
+}
+
+func sameCarryPlaces(actual [][]domain.Entry, expected [][]int64) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+
+	for i, place := range actual {
+		if len(place) != len(expected[i]) {
+			return false
+		}
+
+		for j, entry := range place {
+			if entry.UserID != expected[i][j] {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func swapPlaces(ctx context.Context, tx *sql.Tx, eventID, keyA, keyB int64) error {

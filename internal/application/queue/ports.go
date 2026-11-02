@@ -28,7 +28,7 @@ type EntryRepository interface {
 	Position(ctx context.Context, eventID, userID int64) (int, error)
 	List(ctx context.Context, eventID int64) ([]domain.Entry, error)
 	SwapWithNext(ctx context.Context, eventID, userID int64) error
-	Prepend(ctx context.Context, eventID int64, entries []domain.Entry) error
+	Prepend(ctx context.Context, fromID, toID int64, fromPos int, expected [][]int64) (int, error)
 	SwapSortKeys(ctx context.Context, eventID, userA, userB int64) error
 	JoinPlace(ctx context.Context, eventID, userID int64, username string, partnerID int64) error
 }

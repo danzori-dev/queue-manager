@@ -36,6 +36,12 @@ func (r *Replier) SendHTML(ctx context.Context, msg telego.Message, text string)
 }
 
 func (r *Replier) SendMenu(ctx context.Context, msg telego.Message, text string, kb *telego.InlineKeyboardMarkup) error {
+	_, err := r.SendMenuWithID(ctx, msg, text, kb)
+
+	return err
+}
+
+func (r *Replier) SendMenuWithID(ctx context.Context, msg telego.Message, text string, kb *telego.InlineKeyboardMarkup) (int, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, r.apiTimeout)
 	defer cancel()
 
@@ -51,11 +57,12 @@ func (r *Replier) SendMenu(ctx context.Context, msg telego.Message, text string,
 		params = params.WithMessageThreadID(msg.MessageThreadID)
 	}
 
-	if _, err := r.bot.SendMessage(reqCtx, params); err != nil {
-		return fmt.Errorf("send message: %w", err)
+	sent, err := r.bot.SendMessage(reqCtx, params)
+	if err != nil {
+		return 0, fmt.Errorf("send message: %w", err)
 	}
 
-	return nil
+	return sent.MessageID, nil
 }
 
 func (r *Replier) EditMenu(ctx context.Context, query telego.CallbackQuery, text string, kb *telego.InlineKeyboardMarkup) error {

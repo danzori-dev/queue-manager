@@ -12,51 +12,60 @@ var ErrUnknownAction = errors.New("unknown callback action")
 type ActionKind string
 
 const (
-	ActionJoin          ActionKind = "join"
-	ActionLeave         ActionKind = "leave"
-	ActionList          ActionKind = "list"
-	ActionMenu          ActionKind = "menu"
-	ActionClose         ActionKind = "close"
-	ActionOpen          ActionKind = "open"
-	ActionDelete        ActionKind = "delete"
-	ActionDeleteConfirm ActionKind = "delconfirm"
-	ActionRename        ActionKind = "rename"
-	ActionRenameCancel  ActionKind = "renamecancel"
-	ActionKick          ActionKind = "kick"
-	ActionMembers       ActionKind = "members"
-	ActionSkip          ActionKind = "skip"
-	ActionCarry         ActionKind = "carry"
-	ActionCarryCancel   ActionKind = "carrycancel"
-	ActionSwapEvent     ActionKind = "swapevent"
-	ActionSwapPick      ActionKind = "swappick"
-	ActionSwapPage      ActionKind = "swappage"
-	ActionSwapSend      ActionKind = "swapsend"
-	ActionSwapAbort     ActionKind = "swapabort"
-	ActionSwapAccept    ActionKind = "swapaccept"
-	ActionSwapDecline   ActionKind = "swapdecline"
-	ActionSwapCancel    ActionKind = "swapcancel"
-	ActionInviteEvent   ActionKind = "inviteevent"
-	ActionInvitePick    ActionKind = "invitepick"
-	ActionInvitePage    ActionKind = "invitepage"
-	ActionInviteSend    ActionKind = "invitesend"
-	ActionInviteAbort   ActionKind = "inviteabort"
-	ActionInviteAccept  ActionKind = "inviteaccept"
-	ActionInviteDecline ActionKind = "invitedecline"
-	ActionInviteCancel  ActionKind = "invitecancel"
-	ActionActivityList  ActionKind = "activitylist"
-	ActionActivityLog   ActionKind = "activitylog"
+	ActionJoin             ActionKind = "join"
+	ActionLeave            ActionKind = "leave"
+	ActionList             ActionKind = "list"
+	ActionMenu             ActionKind = "menu"
+	ActionClose            ActionKind = "close"
+	ActionOpen             ActionKind = "open"
+	ActionDelete           ActionKind = "delete"
+	ActionDeleteConfirm    ActionKind = "delconfirm"
+	ActionRename           ActionKind = "rename"
+	ActionRenameCancel     ActionKind = "renamecancel"
+	ActionKick             ActionKind = "kick"
+	ActionMembers          ActionKind = "members"
+	ActionSkip             ActionKind = "skip"
+	ActionCarrySource      ActionKind = "carrysource"
+	ActionCarrySourcesPage ActionKind = "carrysourcespage"
+	ActionCarryPlace       ActionKind = "carryplace"
+	ActionCarryPlacesPage  ActionKind = "carryplacespage"
+	ActionCarryTarget      ActionKind = "carrytarget"
+	ActionCarryTargetsPage ActionKind = "carrytargetspage"
+	ActionCarryPlanPage    ActionKind = "carryplanpage"
+	ActionCarry            ActionKind = "carry"
+	ActionCarryCancel      ActionKind = "carrycancel"
+	ActionSwapEvent        ActionKind = "swapevent"
+	ActionSwapPick         ActionKind = "swappick"
+	ActionSwapPage         ActionKind = "swappage"
+	ActionSwapSend         ActionKind = "swapsend"
+	ActionSwapAbort        ActionKind = "swapabort"
+	ActionSwapAccept       ActionKind = "swapaccept"
+	ActionSwapDecline      ActionKind = "swapdecline"
+	ActionSwapCancel       ActionKind = "swapcancel"
+	ActionInviteEvent      ActionKind = "inviteevent"
+	ActionInvitePick       ActionKind = "invitepick"
+	ActionInvitePage       ActionKind = "invitepage"
+	ActionInviteSend       ActionKind = "invitesend"
+	ActionInviteAbort      ActionKind = "inviteabort"
+	ActionInviteAccept     ActionKind = "inviteaccept"
+	ActionInviteDecline    ActionKind = "invitedecline"
+	ActionInviteCancel     ActionKind = "invitecancel"
+	ActionActivityList     ActionKind = "activitylist"
+	ActionActivityLog      ActionKind = "activitylog"
 )
 
 type Action struct {
-	Kind       ActionKind
-	EventID    int64
-	UserID     int64
-	Page       int
-	EventsPage int
+	Kind           ActionKind
+	EventID        int64
+	UserID         int64
+	Page           int
+	EventsPage     int
+	Position       int
+	ConfirmationID int64
 }
 
 func (a Action) String() string {
-	fields := []int64{a.EventID, a.UserID, int64(a.Page), int64(a.EventsPage)}
+	fields := []int64{a.EventID, a.UserID, int64(a.Page), int64(a.EventsPage), int64(a.Position), a.ConfirmationID}
 
 	for len(fields) > 1 && fields[len(fields)-1] == 0 {
 		fields = fields[:len(fields)-1]
@@ -77,11 +86,11 @@ func ParseAction(s string) (Action, error) {
 	kind, rest, _ := strings.Cut(s, ":")
 	raw := strings.Split(rest, ":")
 
-	if kind == "" || len(raw) > 4 {
+	if kind == "" || len(raw) > 6 {
 		return Action{}, ErrUnknownAction
 	}
 
-	var fields [4]int64
+	var fields [6]int64
 
 	for i, r := range raw {
 		v, err := strconv.ParseInt(r, 10, 64)
@@ -93,10 +102,12 @@ func ParseAction(s string) (Action, error) {
 	}
 
 	return Action{
-		Kind:       ActionKind(kind),
-		EventID:    fields[0],
-		UserID:     fields[1],
-		Page:       int(fields[2]),
-		EventsPage: int(fields[3]),
+		Kind:           ActionKind(kind),
+		EventID:        fields[0],
+		UserID:         fields[1],
+		Page:           int(fields[2]),
+		EventsPage:     int(fields[3]),
+		Position:       int(fields[4]),
+		ConfirmationID: fields[5],
 	}, nil
 }

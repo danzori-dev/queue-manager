@@ -3,8 +3,6 @@ package menu
 import (
 	"context"
 
-	"github.com/mymmrac/telego"
-
 	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -17,9 +15,4 @@ type QueueService interface {
 	RenameEvent(ctx context.Context, eventID, actorID int64, name string) error
 	RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
 	DeleteEvent(ctx context.Context, eventID, actorID int64) error
-}
-
-type CarryActions interface {
-	Confirm(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error)
-	Cancel(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error)
 }
