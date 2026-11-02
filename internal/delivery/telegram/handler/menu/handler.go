@@ -16,6 +16,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/domain/access"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 type Handler struct {
@@ -149,8 +150,14 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 	case callback.ActionKick:
 		return h.kick(ctx, query, a)
 
+	case callback.ActionParticipantAdd:
+		return h.addParicipant(ctx, query, a)
+
 	case callback.ActionMembers:
 		return "", h.showMembers(ctx, query, a.EventID, a.Page, a.EventsPage)
+
+	case callback.ActionParticipantCandidates:
+		return "", h.showParticipantCandidates(ctx, query, a)
 
 	default:
 		return "", callback.ErrUnknownAction
@@ -299,6 +306,41 @@ func (h *Handler) kick(ctx context.Context, query telego.CallbackQuery, a callba
 	return text, h.showMembers(ctx, query, a.EventID, a.Page, a.EventsPage)
 }
 
+func (h *Handler) addParicipant(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
+	added, err := h.queues.AddParticipant(ctx, a.EventID, query.From.ID, a.UserID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back(a.EventsPage))
+	}
+
+	if errors.Is(err, student.ErrStudentNotFound) {
+		return texts.StudentNotFound, h.showParticipantCandidates(ctx, query, a)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	text := texts.ParticipantAdded
+
+	if !added {
+		text = texts.ParticipantAlreadyInQueue
+	}
+
+	view, err := h.queues.EventView(ctx, a.EventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return texts.QueueNotFound, h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back(a.EventsPage))
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	page := keyboard.PageOf(max(0, len(view.Lines)-1))
+	kb, p := keyboard.Members(view, page, query.From.ID, a.EventsPage)
+
+	return text, h.reply.EditMenu(ctx, query, texts.EventMembers(view, p.Index, p.Count), kb)
+}
+
 func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, eventID int64, page, eventsPage int) error {
 	view, err := h.queues.EventView(ctx, eventID)
 	if errors.Is(err, domain.ErrEventNotFound) {
@@ -312,4 +354,23 @@ func (h *Handler) showMembers(ctx context.Context, query telego.CallbackQuery, e
 	kb, p := keyboard.Members(view, page, query.From.ID, eventsPage)
 
 	return h.reply.EditMenu(ctx, query, texts.EventMembers(view, p.Index, p.Count), kb)
+}
+
+func (h *Handler) showParticipantCandidates(ctx context.Context, query telego.CallbackQuery, a callback.Action) error {
+	candidates, err := h.queues.ParticipantCandidates(ctx, a.EventID)
+	if errors.Is(err, domain.ErrEventNotFound) {
+		return h.reply.EditMenu(ctx, query, texts.EventGone, keyboard.Back(a.EventsPage))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	kb, p := keyboard.ParticipantCandidates(candidates, a.EventID, a.Page, a.EventsPage)
+
+	if len(candidates) == 0 {
+		return h.reply.EditMenu(ctx, query, texts.ParticipantCandidatesEmpty, kb)
+	}
+
+	return h.reply.EditMenu(ctx, query, texts.ParticipantCandidatesTitle(a.EventID, p.Index, p.Count), kb)
 }

@@ -14,22 +14,28 @@ const (
 	EventsEmpty = "Очередей нет."
 	EventGone   = "Эта очередь уже удалена."
 
-	ButtonClose         = "Закрыть запись"
-	ButtonOpen          = "Открыть запись"
-	ButtonRefresh       = "Обновить"
-	ButtonMembers       = "Участники"
-	ButtonRename        = "Переименовать"
-	ButtonDelete        = "Удалить очередь"
-	ButtonConfirmDelete = "Да, удалить"
-	ButtonBack          = "← К списку"
-	ButtonBackToEvent   = "← К очереди"
+	ButtonClose          = "Закрыть запись"
+	ButtonOpen           = "Открыть запись"
+	ButtonRefresh        = "Обновить"
+	ButtonMembers        = "Участники"
+	ButtonAddParticipant = "Добавить участника"
+	ButtonRename         = "Переименовать"
+	ButtonDelete         = "Удалить очередь"
+	ButtonConfirmDelete  = "Да, удалить"
+	ButtonBack           = "← К списку"
+	ButtonBackToEvent    = "← К очереди"
+	ButtonBackToMembers  = "← К участникам"
 
 	EventClosedAnswer = "Запись закрыта."
 	EventOpenedAnswer = "Запись открыта."
 
-	KickPressAgain      = "Нажми ещё раз в течение 5 секунд, чтобы убрать студента."
-	ParticipantRemoved  = "Студент убран из очереди."
-	ParticipantNotFound = "Этого студента уже нет в очереди."
+	KickPressAgain             = "Нажми ещё раз в течение 5 секунд, чтобы убрать студента."
+	ParticipantCandidatesEmpty = "Нет студентов для добавления."
+	ParticipantAdded           = "Студент добавлен в очередь."
+	ParticipantAlreadyInQueue  = "Студент уже в очереди."
+	ParticipantRemoved         = "Студент убран из очереди."
+	ParticipantNotFound        = "Этого студента уже нет в очереди."
+	StudentNotFound            = "Студента больше нет в списке группы."
 
 	EventRenamed = "Название изменено."
 	RenameUsage  = "Использование: <code>/rename &lt;id&gt; &lt;название&gt;</code>"
@@ -73,6 +79,14 @@ func EventMembers(view appqueue.View, page, pages int) string {
 	}
 
 	return header + "Нажми на студента, чтобы убрать его из очереди." + pageLine(page, pages)
+}
+
+func ParticipantCandidatesTitle(eventID int64, page, pages int) string {
+	return fmt.Sprintf(
+		"<b>Добавление в очередь #%d</b>\n\n"+
+			"Выбери студента, которого нужно добавить в конец очереди.",
+		eventID,
+	) + pageLine(page, pages)
 }
 
 func RenamePrompt(title string, ttl time.Duration) string {

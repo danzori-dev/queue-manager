@@ -60,7 +60,7 @@ func RegisterRoutes(p RouteParams) Register {
 			actions(
 				callback.ActionList, callback.ActionMenu, callback.ActionClose, callback.ActionOpen,
 				callback.ActionRename, callback.ActionRenameCancel, callback.ActionDelete, callback.ActionDeleteConfirm,
-				callback.ActionKick, callback.ActionMembers,
+				callback.ActionKick, callback.ActionMembers, callback.ActionParticipantCandidates, callback.ActionParticipantAdd,
 			),
 		)
 		private.HandleMessage(p.Handlers.Menu.Text, th.AnyMessageWithText(), th.Not(th.AnyCommand()))

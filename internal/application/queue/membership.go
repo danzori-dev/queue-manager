@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
+
+	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 func (s *Service) Join(ctx context.Context, eventID, userID int64, username string) (JoinResult, error) {
@@ -77,6 +81,62 @@ func (s *Service) Skip(ctx context.Context, eventID, userID int64) (int, error) 
 	)
 
 	return position, nil
+}
+
+func (s *Service) ParticipantCandidates(ctx context.Context, eventID int64) ([]student.Student, error) {
+	if _, err := s.events.Get(ctx, eventID); err != nil {
+		return nil, err
+	}
+
+	entries, err := s.entries.List(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := s.students.List()
+
+	candidates = slices.DeleteFunc(
+		candidates, func(candidate student.Student) bool {
+			return slices.ContainsFunc(
+				entries, func(entry domain.Entry) bool {
+					return entry.UserID == candidate.ID
+				},
+			)
+		},
+	)
+
+	return candidates, nil
+}
+
+func (s *Service) AddParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error) {
+	if _, err := s.events.Get(ctx, eventID); err != nil {
+		return false, err
+	}
+
+	studentName, ok := s.students.Name(userID)
+	if !ok {
+		return false, student.ErrStudentNotFound
+	}
+
+	added, err := s.entries.Add(ctx, eventID, userID, "")
+	if err != nil {
+		return false, fmt.Errorf("add entry: %w", err)
+	}
+
+	if !added {
+		return false, nil
+	}
+
+	s.scheduler.Schedule(eventID)
+	s.audit(
+		ctx, actorID, ActionParticipantAdded,
+		slog.Int64(AttrEventID, eventID),
+		slog.Int64(AttrActorID, actorID),
+		slog.Int64(AttrPeerUserID, userID),
+		slog.String(AttrPeerName, studentName),
+	)
+
+	return true, nil
 }
 
 func (s *Service) RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error) {
