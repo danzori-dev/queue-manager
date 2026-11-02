@@ -10,6 +10,7 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/callback"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 func Events(events []domain.Event, requested int) (*telego.InlineKeyboardMarkup, Page) {
@@ -154,7 +155,7 @@ func RenameCancel(eventID int64, eventsPage int) *telego.InlineKeyboardMarkup {
 func Members(view appqueue.View, requested int, selfID int64, eventsPage int) (*telego.InlineKeyboardMarkup, Page) {
 	eventID := view.Event.ID
 	p := paginate(len(view.Lines), requested, pageSize)
-	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+3)
 
 	for _, line := range view.Lines[p.start:p.end] {
 		label := fmt.Sprintf("❌ %d. %s", line.Position, line.Name)
@@ -189,10 +190,65 @@ func Members(view appqueue.View, requested int, selfID int64, eventsPage int) (*
 	)
 
 	rows = append(
-		rows, tu.InlineKeyboardRow(
+		rows,
+		tu.InlineKeyboardRow(
+			button(
+				texts.ButtonAddParticipant, callback.Action{
+					Kind:       callback.ActionParticipantCandidates,
+					EventID:    eventID,
+					EventsPage: eventsPage,
+				},
+			),
+		),
+		tu.InlineKeyboardRow(
 			button(
 				texts.ButtonBackToEvent, callback.Action{
 					Kind:       callback.ActionMenu,
+					EventID:    eventID,
+					EventsPage: eventsPage,
+				},
+			),
+		),
+	)
+
+	return tu.InlineKeyboard(rows...), p
+}
+
+func ParticipantCandidates(students []student.Student, eventID int64, requested, eventsPage int) (*telego.InlineKeyboardMarkup, Page) {
+	p := paginate(len(students), requested, pageSize)
+	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
+
+	for _, st := range students[p.start:p.end] {
+		rows = append(
+			rows, tu.InlineKeyboardRow(
+				button(
+					st.Name, callback.Action{
+						Kind:       callback.ActionParticipantAdd,
+						EventID:    eventID,
+						UserID:     st.ID,
+						EventsPage: eventsPage,
+					},
+				),
+			),
+		)
+	}
+
+	rows = appendPageRow(
+		rows, p, func(index int) callback.Action {
+			return callback.Action{
+				Kind:       callback.ActionParticipantCandidates,
+				EventID:    eventID,
+				Page:       index,
+				EventsPage: eventsPage,
+			}
+		},
+	)
+
+	rows = append(
+		rows, tu.InlineKeyboardRow(
+			button(
+				texts.ButtonBackToMembers, callback.Action{
+					Kind:       callback.ActionMembers,
 					EventID:    eventID,
 					EventsPage: eventsPage,
 				},

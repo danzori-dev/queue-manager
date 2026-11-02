@@ -5,6 +5,7 @@ import (
 
 	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
+	"github.com/danzori-dev/queue-manager/internal/domain/student"
 )
 
 type QueueService interface {
@@ -13,6 +14,8 @@ type QueueService interface {
 	CloseEvent(ctx context.Context, eventID, actorID int64) error
 	OpenEvent(ctx context.Context, eventID, actorID int64) error
 	RenameEvent(ctx context.Context, eventID, actorID int64, name string) error
+	ParticipantCandidates(ctx context.Context, eventID int64) ([]student.Student, error)
+	AddParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
 	RemoveParticipant(ctx context.Context, eventID, actorID, userID int64) (bool, error)
 	DeleteEvent(ctx context.Context, eventID, actorID int64) error
 }
