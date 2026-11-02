@@ -3,15 +3,15 @@ package carry
 import (
 	"context"
 	"errors"
-	"strconv"
-	"strings"
 
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 
-	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/command"
+	appqueue "github.com/danzori-dev/queue-manager/internal/application/queue"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/callback"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/keyboard"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/reply"
+	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/server/middleware"
 	"github.com/danzori-dev/queue-manager/internal/delivery/telegram/texts"
 	"github.com/danzori-dev/queue-manager/internal/domain/access"
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -36,30 +36,174 @@ func (h *Handler) Carry(ctx *th.Context, msg telego.Message) error {
 		return err
 	}
 
-	draft, ok := parseArgs(command.Args(msg.Text))
-	if !ok {
-		return h.reply.SendHTML(ctx, msg, texts.CarryUsage)
-	}
+	h.carries.Put(msg.From.ID, carryDraft{})
 
-	plan, err := h.queues.PlanCarry(ctx, draft.fromID, draft.fromPos, draft.toID)
+	events, err := h.queues.CarrySources(ctx)
 	if err != nil {
-		text, known := errorText(err)
-		if !known {
-			return err
-		}
-
-		return h.reply.SendHTML(ctx, msg, text)
+		return err
 	}
 
-	h.carries.Put(msg.From.ID, draft)
+	if len(events) == 0 {
+		return h.reply.SendHTML(ctx, msg, texts.CarrySourcesEmpty)
+	}
 
-	return h.reply.SendMenu(ctx, msg, texts.CarryPlan(plan), keyboard.Carry(draft.fromID))
+	kb, p := keyboard.CarrySources(events, 0, 0)
+
+	return h.reply.SendMenu(ctx, msg, texts.CarryChooseSource(p.Index, p.Count), kb)
 }
 
-func (h *Handler) Confirm(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error) {
-	draft, ok := h.carries.Take(query.From.ID, fromID)
+func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
+	if !middleware.RoleFromContext(ctx).AtLeast(access.RoleAdmin) {
+		return h.reply.Answer(ctx, query, texts.AccessDenied)
+	}
+
+	action, err := callback.ParseAction(query.Data)
+	if err != nil {
+		return h.reply.Answer(ctx, query, "")
+	}
+
+	text, err := h.applyAction(ctx, query, action)
+	if err != nil {
+		_ = h.reply.Answer(ctx, query, texts.InternalError)
+
+		return err
+	}
+
+	return h.reply.Answer(ctx, query, text)
+}
+
+func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, a callback.Action) (string, error) {
+	switch a.Kind {
+	case callback.ActionCarrySourcesPage:
+		return "", h.showSources(ctx, query, a.Page)
+
+	case callback.ActionCarrySource:
+		return "", h.showPlaces(ctx, query, a.EventID, 0)
+
+	case callback.ActionCarryPlace:
+		return "", h.showTargets(ctx, query, a.EventID, a.Position, 0)
+
+	case callback.ActionCarryTargetsPage:
+		return "", h.showTargets(ctx, query, a.EventID, a.Position, a.Page)
+
+	case callback.ActionCarryTarget:
+		return "", h.showPlan(ctx, query, a.EventID)
+
+	case callback.ActionCarryPlacesPage:
+		return "", h.showPlaces(ctx, query, a.EventID, a.Page)
+
+	case callback.ActionCarryPlanPage:
+		return "", h.showPlanPage(ctx, query, a.EventID, a.Page)
+
+	case callback.ActionCarry:
+		return h.confirm(ctx, query, a.EventID)
+
+	case callback.ActionCarryCancel:
+		return h.cancel(ctx, query, a.EventID)
+
+	default:
+		return "", callback.ErrUnknownAction
+	}
+}
+
+func (h *Handler) showSources(ctx context.Context, query telego.CallbackQuery, page int) error {
+	draft, ok := h.carries.Get(query.From.ID)
 	if !ok {
-		return texts.CarryExpired, h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
+	events, err := h.queues.CarrySources(ctx)
+	if err != nil {
+		return h.stepFailed(ctx, query, err)
+	}
+
+	if len(events) == 0 {
+		return h.reply.EditMenu(ctx, query, texts.CarrySourcesEmpty, keyboard.CarryCancel(draft.fromID))
+	}
+
+	kb, p := keyboard.CarrySources(events, page, draft.fromID)
+
+	return h.reply.EditMenu(ctx, query, texts.CarryChooseSource(p.Index, p.Count), kb)
+}
+
+func (h *Handler) showPlaces(ctx context.Context, query telego.CallbackQuery, fromID int64, page int) error {
+	view, err := h.queues.CarrySource(ctx, fromID)
+	if err != nil {
+		return h.stepFailed(ctx, query, err)
+	}
+
+	if !h.carries.SelectSource(query.From.ID, fromID) {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
+	if len(view.Lines) == 0 {
+		return h.reply.EditMenu(ctx, query, texts.CarrySourceEmpty, keyboard.CarryBackToSources(fromID))
+	}
+
+	kb, p := keyboard.CarryPlaces(view, page)
+
+	return h.reply.EditMenu(ctx, query, texts.CarryChoosePlace(view.Event.Title, p.Index, p.Count), kb)
+}
+
+func (h *Handler) showTargets(ctx context.Context, query telego.CallbackQuery, fromID int64, fromPos, page int) error {
+	events, err := h.queues.CarryTargets(ctx, fromID, fromPos)
+	if err != nil {
+		return h.stepFailed(ctx, query, err)
+	}
+
+	kb, p := keyboard.CarryTargets(events, fromID, fromPos, page)
+
+	if !h.carries.SelectPlace(query.From.ID, fromID, fromPos, p.Index) {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
+	if len(events) == 0 {
+		return h.reply.EditMenu(ctx, query, texts.CarryTargetsEmpty, kb)
+	}
+
+	return h.reply.EditMenu(ctx, query, texts.CarryChooseTarget(fromID, fromPos, p.Index, p.Count), kb)
+}
+
+func (h *Handler) showPlan(ctx context.Context, query telego.CallbackQuery, toID int64) error {
+	draft, ok := h.carries.Get(query.From.ID)
+	if !ok {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
+	if draft.fromID == 0 || draft.fromPos < 1 {
+		return nil
+	}
+
+	plan, err := h.queues.PlanCarry(ctx, draft.fromID, draft.fromPos, toID)
+	if err != nil {
+		return h.stepFailed(ctx, query, err)
+	}
+
+	draft, ok = h.carries.SetPlan(query.From.ID, draft.fromPos, plan)
+	if !ok {
+		return nil
+	}
+
+	return h.renderPlan(ctx, query, draft, 0)
+}
+
+func (h *Handler) showPlanPage(ctx context.Context, query telego.CallbackQuery, toID int64, page int) error {
+	draft, ok := h.carries.Get(query.From.ID)
+	if !ok {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
+	if draft.plan == nil || draft.toID != toID {
+		return nil
+	}
+
+	return h.renderPlan(ctx, query, draft, page)
+}
+
+func (h *Handler) confirm(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error) {
+	draft, ok := h.carries.TakePlan(query.From.ID, fromID)
+	if !ok {
+		return texts.CarryExpired, nil
 	}
 
 	moved, err := h.queues.Carry(ctx, draft.fromID, draft.fromPos, draft.toID, query.From.ID)
@@ -75,31 +219,47 @@ func (h *Handler) Confirm(ctx context.Context, query telego.CallbackQuery, fromI
 	return texts.CarryDoneAnswer, h.reply.EditMenu(ctx, query, texts.Carried(moved), keyboard.None())
 }
 
-func (h *Handler) Cancel(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error) {
-	h.carries.Take(query.From.ID, fromID)
+func (h *Handler) cancel(ctx context.Context, query telego.CallbackQuery, fromID int64) (string, error) {
+	if _, ok := h.carries.Take(query.From.ID, fromID); !ok {
+		return texts.CarryExpired, nil
+	}
 
 	return texts.CarryCanceled, h.reply.EditMenu(ctx, query, texts.CarryCanceled, keyboard.None())
 }
 
-func parseArgs(args string) (carryDraft, bool) {
-	fields := strings.Fields(args)
-	if len(fields) != 3 {
-		return carryDraft{}, false
+func (h *Handler) renderPlan(ctx context.Context, query telego.CallbackQuery, draft carryDraft, page int) error {
+	plan := *draft.plan
+
+	kb, p := keyboard.Carry(plan, draft.targetsPage, page)
+	start, end := p.Bounds()
+
+	firstPosition := plan.Lines[0].Position
+	lines := make([]appqueue.Line, 0)
+
+	for _, line := range plan.Lines {
+		index := line.Position - firstPosition
+
+		if index >= start && index < end {
+			lines = append(lines, line)
+		}
 	}
 
-	fromID, fromErr := strconv.ParseInt(fields[0], 10, 64)
-	fromPos, posErr := strconv.Atoi(fields[1])
-	toID, toErr := strconv.ParseInt(fields[2], 10, 64)
+	return h.reply.EditMenu(ctx, query, texts.CarryPlan(plan, lines, p.Index, p.Count), kb)
+}
 
-	if errors.Join(fromErr, posErr, toErr) != nil {
-		return carryDraft{}, false
+func (h *Handler) stepFailed(ctx context.Context, query telego.CallbackQuery, err error) error {
+	text, known := errorText(err)
+	if !known {
+		return err
 	}
 
-	return carryDraft{
-		fromID:  fromID,
-		fromPos: fromPos,
-		toID:    toID,
-	}, true
+	kb := keyboard.None()
+
+	if draft, ok := h.carries.Get(query.From.ID); ok {
+		kb = keyboard.CarryBackToSources(draft.fromID)
+	}
+
+	return h.reply.EditMenu(ctx, query, text, kb)
 }
 
 func errorText(err error) (string, bool) {

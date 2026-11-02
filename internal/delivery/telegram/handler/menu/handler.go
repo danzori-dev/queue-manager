@@ -21,16 +21,14 @@ import (
 type Handler struct {
 	reply    *reply.Replier
 	queues   QueueService
-	carries  CarryActions
 	confirms *confirm.DoublePress
 	renames  *renames
 }
 
-func New(replier *reply.Replier, queues QueueService, carries CarryActions) *Handler {
+func New(replier *reply.Replier, queues QueueService) *Handler {
 	return &Handler{
 		reply:    replier,
 		queues:   queues,
-		carries:  carries,
 		confirms: confirm.New(),
 		renames:  newRenames(),
 	}
@@ -153,12 +151,6 @@ func (h *Handler) applyMenuAction(ctx context.Context, query telego.CallbackQuer
 
 	case callback.ActionMembers:
 		return "", h.showMembers(ctx, query, a.EventID, a.Page, a.EventsPage)
-
-	case callback.ActionCarry:
-		return h.carries.Confirm(ctx, query, a.EventID)
-
-	case callback.ActionCarryCancel:
-		return h.carries.Cancel(ctx, query, a.EventID)
 
 	default:
 		return "", callback.ErrUnknownAction

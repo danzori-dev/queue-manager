@@ -61,7 +61,6 @@ func New(d Deps) Handlers {
 	replier := reply.New(d.Bot, d.APITimeout, d.Log)
 
 	swapHandler := swap.New(replier, d.Swaps)
-	carryHandler := carry.New(replier, d.Queues)
 	inviteHandler := invite.New(replier, d.Invites)
 
 	return Handlers{
@@ -85,8 +84,8 @@ func New(d Deps) Handlers {
 		),
 		Admin:    admin.New(replier, d.Admins, d.Students),
 		Queue:    queue.New(replier, d.Queues, d.Students),
-		Menu:     menu.New(replier, d.Queues, carryHandler),
-		Carry:    carryHandler,
+		Menu:     menu.New(replier, d.Queues),
+		Carry:    carry.New(replier, d.Queues),
 		Swap:     swapHandler,
 		Invite:   inviteHandler,
 		Activity: activity.New(replier, d.Activity, d.Students),
