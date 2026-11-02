@@ -26,19 +26,47 @@ func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, userna
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	const query = `
-		INSERT INTO queue_entries (event_id, user_id, username, sort_key)
-		SELECT ?, ?, ?, coalesce(max(sort_key), 0) + 1
-		FROM queue_entries
-		WHERE event_id = ?
-		ON CONFLICT (event_id, user_id) DO NOTHING
-		RETURNING id
-	`
+	const (
+		eventQuery = `
+			SELECT id
+			FROM events
+			WHERE id = ?
+		`
+
+		insertQuery = `
+			INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+			SELECT ?, ?, ?, coalesce(max(sort_key), 0) + 1
+			FROM queue_entries
+			WHERE event_id = ?
+			ON CONFLICT (event_id, user_id) DO NOTHING
+			RETURNING id
+		`
+	)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	var existingID int64
+
+	err = tx.QueryRowContext(ctx, eventQuery, eventID).Scan(&existingID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, domain.ErrEventNotFound
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("query entry event: %w", err)
+	}
 
 	var id int64
 
-	err := r.db.
-		QueryRowContext(ctx, query, eventID, userID, username, eventID).
+	err = r.db.
+		QueryRowContext(ctx, insertQuery, eventID, userID, username, eventID).
 		Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
@@ -46,6 +74,10 @@ func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, userna
 
 	if err != nil {
 		return false, fmt.Errorf("insert entry: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
 	}
 
 	return true, nil
