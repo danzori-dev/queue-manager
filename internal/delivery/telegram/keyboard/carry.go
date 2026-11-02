@@ -63,7 +63,7 @@ func CarryPlaces(view appqueue.View, requested, sourcesPage int) (*telego.Inline
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
 	for _, place := range places[p.start:p.end] {
-		names := make([]string, len(place))
+		names := make([]string, 0, len(place))
 
 		for i, line := range place {
 			names[i] = line.Name
@@ -99,7 +99,7 @@ func CarryPlaces(view appqueue.View, requested, sourcesPage int) (*telego.Inline
 	return tu.InlineKeyboard(rows...), p
 }
 
-func CarryTargets(events []domain.Event, fromID int64, fromPos int, requested int) (*telego.InlineKeyboardMarkup, Page) {
+func CarryTargets(events []domain.Event, fromID int64, fromPos, requested int) (*telego.InlineKeyboardMarkup, Page) {
 	p := paginate(len(events), requested, pageSize)
 	rows := make([][]telego.InlineKeyboardButton, 0, p.end-p.start+2)
 
@@ -210,7 +210,8 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 	)
 
 	rows = append(
-		rows, tu.InlineKeyboardRow(
+		rows,
+		tu.InlineKeyboardRow(
 			button(
 				texts.ButtonCarry, callback.Action{
 					Kind:           callback.ActionCarry,
@@ -226,10 +227,7 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 				},
 			).WithStyle(telego.ButtonStyleDanger),
 		),
-	)
-
-	rows = append(
-		rows, tu.InlineKeyboardRow(
+		tu.InlineKeyboardRow(
 			button(
 				texts.ButtonBack, callback.Action{
 					Kind:           callback.ActionCarryTargetsPage,

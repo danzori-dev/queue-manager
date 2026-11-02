@@ -85,6 +85,8 @@ func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
 		if action.ConfirmationID == 0 {
 			return h.reply.Answer(ctx, query, texts.CarryExpired)
 		}
+
+	default:
 	}
 
 	draft, err := h.carries.Begin(query.From.ID, query.Message.GetChat().ID, query.Message.GetMessageID(), action.ConfirmationID)
@@ -107,55 +109,55 @@ func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
 }
 
 func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, draft *carryDraft, a callback.Action) (string, error) {
-	switch a.Kind {
-	case callback.ActionCarry:
-		return h.confirm(ctx, query, draft, a.EventID)
-
-	case callback.ActionCarryCancel:
-		return h.cancel(ctx, query, draft, a.EventID)
-	}
-
-	defer func() {
-		h.carries.Save(query.From.ID, *draft)
-	}()
+	var err error
 
 	switch a.Kind {
 	case callback.ActionCarrySourcesPage:
 		draft.resetPlan()
 
-		return "", h.showSources(ctx, query, draft, a.Page)
+		err = h.showSources(ctx, query, draft, a.Page)
 
 	case callback.ActionCarrySource:
 		draft.resetPlan()
 
-		return "", h.showPlaces(ctx, query, draft, a.EventID, 0)
+		err = h.showPlaces(ctx, query, draft, a.EventID, 0)
 
 	case callback.ActionCarryPlace:
 		draft.resetPlan()
 
-		return "", h.showTargets(ctx, query, draft, a.EventID, a.Position, 0)
+		err = h.showTargets(ctx, query, draft, a.EventID, a.Position, 0)
 
 	case callback.ActionCarryTargetsPage:
 		draft.resetPlan()
 
-		return "", h.showTargets(ctx, query, draft, a.EventID, a.Position, a.Page)
+		err = h.showTargets(ctx, query, draft, a.EventID, a.Position, a.Page)
 
 	case callback.ActionCarryTarget:
 		draft.resetPlan()
 
-		return "", h.showPlan(ctx, query, draft, a.EventID)
+		err = h.showPlan(ctx, query, draft, a.EventID)
 
 	case callback.ActionCarryPlacesPage:
 		draft.resetPlan()
 
-		return "", h.showPlaces(ctx, query, draft, a.EventID, a.Page)
+		err = h.showPlaces(ctx, query, draft, a.EventID, a.Page)
 
 	case callback.ActionCarryPlanPage:
-		return "", h.showPlanPage(ctx, query, draft, a.EventID, a.Page)
+		err = h.showPlanPage(ctx, query, draft, a.EventID, a.Page)
+
+	case callback.ActionCarry:
+		return h.confirm(ctx, query, draft, a.EventID)
+
+	case callback.ActionCarryCancel:
+		return h.cancel(ctx, query, draft, a.EventID)
 
 	default:
-		return "", callback.ErrUnknownAction
+		err = callback.ErrUnknownAction
 	}
+
+	h.carries.Save(query.From.ID, *draft)
+
+	return "", err
 }
 
 func (h *Handler) showSources(ctx context.Context, query telego.CallbackQuery, draft *carryDraft, page int) error {

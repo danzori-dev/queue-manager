@@ -38,14 +38,14 @@ func CarryChoosePlace(title string, page, pages int) string {
 	) + pageLine(page, pages)
 }
 
-func CarryChooseTarget(fromID int64, fromPos int, page, pages int) string {
+func CarryChooseTarget(fromID int64, fromPos, page, pages int) string {
 	return fmt.Sprintf(
 		"Перенос из очереди #%d, начиная с %d-го места.\n\nВыбери открытую очередь назначения.",
 		fromID, fromPos,
 	) + pageLine(page, pages)
 }
 
-func CarryPlan(plan appqueue.CarryPlan, lines []appqueue.Line, page int, pages int) string {
+func CarryPlan(plan appqueue.CarryPlan, lines []appqueue.Line, page, pages int) string {
 	var b strings.Builder
 
 	fmt.Fprintf(
@@ -54,7 +54,7 @@ func CarryPlan(plan appqueue.CarryPlan, lines []appqueue.Line, page int, pages i
 	)
 
 	for _, place := range groupPlaces(lines) {
-		names := make([]string, len(place))
+		names := make([]string, 0, len(place))
 
 		for i, line := range place {
 			names[i] = html.EscapeString(line.Name)
