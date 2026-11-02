@@ -117,11 +117,15 @@ func (h *Handler) showSources(ctx context.Context, query telego.CallbackQuery, p
 		return h.stepFailed(ctx, query, err)
 	}
 
+	kb, p := keyboard.CarrySources(events, page, draft.fromID)
+
+	if !h.carries.SetSourcesPage(query.From.ID, p.Index) {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
+	}
+
 	if len(events) == 0 {
 		return h.reply.EditMenu(ctx, query, texts.CarrySourcesEmpty, keyboard.CarryCancel(draft.fromID))
 	}
-
-	kb, p := keyboard.CarrySources(events, page, draft.fromID)
 
 	return h.reply.EditMenu(ctx, query, texts.CarryChooseSource(p.Index, p.Count), kb)
 }
@@ -136,11 +140,16 @@ func (h *Handler) showPlaces(ctx context.Context, query telego.CallbackQuery, fr
 		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
 	}
 
-	if len(view.Lines) == 0 {
-		return h.reply.EditMenu(ctx, query, texts.CarrySourceEmpty, keyboard.CarryBackToSources(fromID))
+	draft, ok := h.carries.Get(query.From.ID)
+	if !ok {
+		return h.reply.EditMenu(ctx, query, texts.CarryExpired, keyboard.None())
 	}
 
-	kb, p := keyboard.CarryPlaces(view, page)
+	if len(view.Lines) == 0 {
+		return h.reply.EditMenu(ctx, query, texts.CarrySourceEmpty, keyboard.CarryBackToSources(fromID, draft.sourcesPage))
+	}
+
+	kb, p := keyboard.CarryPlaces(view, page, draft.sourcesPage)
 
 	return h.reply.EditMenu(ctx, query, texts.CarryChoosePlace(view.Event.Title, p.Index, p.Count), kb)
 }
@@ -256,7 +265,7 @@ func (h *Handler) stepFailed(ctx context.Context, query telego.CallbackQuery, er
 	kb := keyboard.None()
 
 	if draft, ok := h.carries.Get(query.From.ID); ok {
-		kb = keyboard.CarryBackToSources(draft.fromID)
+		kb = keyboard.CarryBackToSources(draft.fromID, draft.sourcesPage)
 	}
 
 	return h.reply.EditMenu(ctx, query, text, kb)

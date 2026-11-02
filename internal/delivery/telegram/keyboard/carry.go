@@ -44,7 +44,7 @@ func CarrySources(events []domain.Event, requested int, selectedFromID int64) (*
 	return tu.InlineKeyboard(rows...), p
 }
 
-func CarryPlaces(view appqueue.View, requested int) (*telego.InlineKeyboardMarkup, Page) {
+func CarryPlaces(view appqueue.View, requested, sourcesPage int) (*telego.InlineKeyboardMarkup, Page) {
 	places := make([][]appqueue.Line, 0)
 
 	for _, line := range view.Lines {
@@ -94,7 +94,7 @@ func CarryPlaces(view appqueue.View, requested int) (*telego.InlineKeyboardMarku
 		},
 	)
 
-	rows = append(rows, CarryBackToSources(view.Event.ID).InlineKeyboard...)
+	rows = append(rows, CarryBackToSources(view.Event.ID, sourcesPage).InlineKeyboard...)
 
 	return tu.InlineKeyboard(rows...), p
 }
@@ -132,13 +132,13 @@ func CarryTargets(events []domain.Event, fromID int64, fromPos int, requested in
 	return tu.InlineKeyboard(rows...), p
 }
 
-func CarryBackToSources(fromID int64) *telego.InlineKeyboardMarkup {
+func CarryBackToSources(fromID int64, page int) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			button(
 				texts.ButtonBack, callback.Action{
 					Kind: callback.ActionCarrySourcesPage,
-					Page: 0,
+					Page: page,
 				},
 			),
 			button(

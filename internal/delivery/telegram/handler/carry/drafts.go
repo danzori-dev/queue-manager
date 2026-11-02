@@ -14,6 +14,7 @@ type carryDraft struct {
 	fromPos     int
 	toID        int64
 	targetsPage int
+	sourcesPage int
 	plan        *appqueue.CarryPlan
 	createdAt   time.Time
 }
@@ -53,6 +54,27 @@ func (d *carryDrafts) Put(adminID int64, draft carryDraft) {
 
 	draft.createdAt = time.Now()
 	d.drafts[adminID] = draft
+}
+
+func (d *carryDrafts) SetSourcesPage(adminID int64, page int) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	draft, ok := d.drafts[adminID]
+	if !ok {
+		return false
+	}
+
+	if time.Since(draft.createdAt) > carryDraftTTL {
+		delete(d.drafts, adminID)
+
+		return false
+	}
+
+	draft.sourcesPage = page
+	d.drafts[adminID] = draft
+
+	return true
 }
 
 func (d *carryDrafts) SetPlan(adminID int64, fromPos int, plan appqueue.CarryPlan) (carryDraft, bool) {
