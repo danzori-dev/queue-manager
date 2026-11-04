@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"syscall"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/danzori-dev/queue-manager/internal/worker/cleaner"
 	"github.com/danzori-dev/queue-manager/internal/worker/scheduler"
 )
+
+const ownerAlertShutdownTimeout = 20 * time.Second
 
 func Run(ctx context.Context) error {
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -62,16 +65,23 @@ func Run(ctx context.Context) error {
 		},
 	)
 
-	if err := run(ctx, cfg, log, notifier); err != nil {
-		log.ErrorContext(
-			ctx, "application stopped",
+	runErr := run(ctx, cfg, log.Logger, notifier)
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), ownerAlertShutdownTimeout)
+	defer cancelShutdown()
+
+	if err := log.Shutdown(shutdownCtx, runErr); err != nil {
+		log.WarnContext(
+			shutdownCtx, "owner alert shutdown incomplete",
 			slog.Any("err", err),
 		)
-
-		return err
 	}
 
-	_ = notifier.Send(context.WithoutCancel(ctx), texts.BotStopped)
+	if runErr != nil {
+		return runErr
+	}
+
+	_ = notifier.Send(shutdownCtx, texts.BotStopped)
 
 	return nil
 }
