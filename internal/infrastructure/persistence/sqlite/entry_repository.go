@@ -65,7 +65,7 @@ func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, userna
 
 	var id int64
 
-	err = r.db.
+	err = tx.
 		QueryRowContext(ctx, insertQuery, eventID, userID, username, eventID).
 		Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
