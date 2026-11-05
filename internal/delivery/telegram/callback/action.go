@@ -49,6 +49,7 @@ const (
 	ActionInvitePage            ActionKind = "invitepage"
 	ActionInviteSend            ActionKind = "invitesend"
 	ActionInviteAbort           ActionKind = "inviteabort"
+	ActionInviteAnother         ActionKind = "inviteanother"
 	ActionInviteAccept          ActionKind = "inviteaccept"
 	ActionInviteDecline         ActionKind = "invitedecline"
 	ActionInviteCancel          ActionKind = "invitecancel"
