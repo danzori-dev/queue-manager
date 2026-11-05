@@ -62,6 +62,29 @@ func (s *inviteStore) add(req domain.InviteRequest) (domain.InviteRequest, error
 	return req, nil
 }
 
+func (s *inviteStore) activeRecipients(fromID int64) []int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	recipients := make([]int64, 0, maxActiveInvites)
+
+	for _, stored := range s.requests {
+		req := stored.request
+
+		if req.FromID != fromID {
+			continue
+		}
+
+		if req.Expired() && !stored.processing {
+			continue
+		}
+
+		recipients = append(recipients, req.ToID)
+	}
+
+	return recipients
+}
+
 func (s *inviteStore) setMessage(id int64, messageID int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

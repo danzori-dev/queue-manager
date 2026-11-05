@@ -36,8 +36,14 @@ func (s *Service) InviteCandidates(ctx context.Context, eventID, userID int64) (
 		return InviteCandidates{}, domain.ErrPlaceFull
 	}
 
+	recipients := s.invites.activeRecipients(userID)
+
 	students := slices.DeleteFunc(
 		s.students.List(), func(st student.Student) bool {
+			if slices.Contains(recipients, st.ID) {
+				return true
+			}
+
 			return slices.ContainsFunc(
 				place, func(e domain.Entry) bool {
 					return e.UserID == st.ID
