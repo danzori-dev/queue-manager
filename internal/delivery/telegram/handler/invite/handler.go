@@ -150,7 +150,7 @@ func (h *Handler) send(ctx context.Context, query telego.CallbackQuery, eventID,
 		return h.stepFailed(ctx, query, err)
 	}
 
-	return h.reply.EditMenu(ctx, query, texts.InviteSent(inv.ToName), keyboard.InviteCancel(inv.ID))
+	return h.reply.EditMenu(ctx, query, texts.InviteSent(inv.ToName), keyboard.InviteSent(inv.ID, inv.Event.ID))
 }
 
 func (h *Handler) another(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {

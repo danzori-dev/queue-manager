@@ -86,7 +86,7 @@ func InviteConfirm(eventID, toID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func InviteCancel(requestID int64) *telego.InlineKeyboardMarkup {
+func InviteSent(requestID, eventID int64) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			button(
@@ -95,6 +95,14 @@ func InviteCancel(requestID int64) *telego.InlineKeyboardMarkup {
 					EventID: requestID,
 				},
 			).WithStyle(telego.ButtonStyleDanger),
+		),
+		tu.InlineKeyboardRow(
+			button(
+				texts.ButtonInviteAnother, callback.Action{
+					Kind:    callback.ActionInviteAnother,
+					EventID: eventID,
+				},
+			),
 		),
 	)
 }

@@ -24,6 +24,7 @@ const (
 
 	ButtonInviteSend    = "Отправить приглашение"
 	ButtonInviteCancel  = "Отменить приглашение"
+	ButtonInviteAnother = "Пригласить ещё одного"
 	ButtonInviteAccept  = "Принять"
 	ButtonInviteDecline = "Отклонить"
 
