@@ -88,6 +88,9 @@ func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, a
 	case callback.ActionInviteSend:
 		return "", h.send(ctx, query, a.EventID, a.UserID)
 
+	case callback.ActionInviteAnother:
+		return h.another(ctx, query, a.EventID)
+
 	case callback.ActionInviteAbort:
 		return "", h.reply.EditMenu(ctx, query, texts.InviteAborted, keyboard.None())
 
@@ -147,7 +150,31 @@ func (h *Handler) send(ctx context.Context, query telego.CallbackQuery, eventID,
 		return h.stepFailed(ctx, query, err)
 	}
 
-	return h.reply.EditMenu(ctx, query, texts.InviteSent(inv.ToName), keyboard.InviteCancel(inv.ID))
+	return h.reply.EditMenu(ctx, query, texts.InviteSent(inv.ToName), keyboard.InviteSent(inv.ID, inv.Event.ID))
+}
+
+func (h *Handler) another(ctx context.Context, query telego.CallbackQuery, eventID int64) (string, error) {
+	c, err := h.invites.InviteCandidates(ctx, eventID, query.From.ID)
+	if err != nil {
+		text, known := errorText(err)
+		if known {
+			return text, nil
+		}
+
+		return "", err
+	}
+
+	if len(c.Students) == 0 {
+		return texts.InviteNobody, nil
+	}
+
+	kb, p := keyboard.InvitePeople(c, 0)
+
+	msg := telego.Message{
+		Chat: query.Message.GetChat(),
+	}
+
+	return "", h.reply.SendMenu(ctx, msg, texts.InviteChoosePerson(c.Event.ID, c.Event.Title, c.Position, p.Index, p.Count), kb)
 }
 
 func (h *Handler) accept(ctx context.Context, query telego.CallbackQuery, requestID int64) (string, error) {

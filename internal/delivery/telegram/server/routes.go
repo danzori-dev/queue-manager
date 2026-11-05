@@ -88,7 +88,8 @@ func RegisterRoutes(p RouteParams) Register {
 			p.Handlers.Invite.Callback, th.AnyCallbackQueryWithMessage(),
 			actions(
 				callback.ActionInviteEvent, callback.ActionInvitePick, callback.ActionInvitePage, callback.ActionInviteSend,
-				callback.ActionInviteAbort, callback.ActionInviteAccept, callback.ActionInviteDecline, callback.ActionInviteCancel,
+				callback.ActionInviteAnother, callback.ActionInviteAbort, callback.ActionInviteAccept, callback.ActionInviteDecline,
+				callback.ActionInviteCancel,
 			),
 		)
 
