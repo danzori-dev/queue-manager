@@ -163,10 +163,11 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *tel
 
 	queueMessenger := telegram.NewQueueMessenger(
 		telegram.QueueMessengerDeps{
-			Bot:        bot,
-			Renderer:   render.NewMessages(me.Username),
-			APITimeout: cfg.Telegram.APITimeout,
-			Log:        log,
+			Bot:                         bot,
+			Renderer:                    render.NewMessages(me.Username),
+			APITimeout:                  cfg.Telegram.APITimeout,
+			RemovalNotificationsEnabled: cfg.Telegram.RemovalNotificationsEnabled,
+			Log:                         log,
 		},
 	)
 
