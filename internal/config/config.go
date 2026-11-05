@@ -16,13 +16,14 @@ type Config struct {
 }
 
 type Telegram struct {
-	Token      string          `validate:"required"                       yaml:"token"`
-	OwnerID    int64           `validate:"required,gt=0"                  yaml:"owner_id"`
-	APITimeout time.Duration   `validate:"required,gt=0"                  yaml:"api_timeout"`
-	Mode       string          `validate:"required,oneof=polling webhook" yaml:"mode"`
-	Retry      TelegramRetry   `yaml:"retry"`
-	Poll       TelegramPoll    `yaml:"poll"`
-	Webhook    TelegramWebhook `yaml:"webhook"`
+	Token                       string          `validate:"required"                       yaml:"token"`
+	OwnerID                     int64           `validate:"required,gt=0"                  yaml:"owner_id"`
+	APITimeout                  time.Duration   `validate:"required,gt=0"                  yaml:"api_timeout"`
+	Mode                        string          `validate:"required,oneof=polling webhook" yaml:"mode"`
+	RemovalNotificationsEnabled bool            `yaml:"removal_notifications_enabled"`
+	Retry                       TelegramRetry   `yaml:"retry"`
+	Poll                        TelegramPoll    `yaml:"poll"`
+	Webhook                     TelegramWebhook `yaml:"webhook"`
 }
 
 type TelegramRetry struct {

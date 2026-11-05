@@ -3,6 +3,7 @@ telegram:
     owner_id: "${TELEGRAM_BOT_OWNER_ID}"
     api_timeout: "${TELEGRAM_API_TIMEOUT:-10s}"
     mode: "${TELEGRAM_MODE:-polling}"
+    removal_notifications_enabled: "${TELEGRAM_REMOVAL_NOTIFICATIONS_ENABLED:-true}"
     retry:
         max_attempts: "${TELEGRAM_RETRY_MAX_ATTEMPTS:-3}"
         exponent_base: "${TELEGRAM_RETRY_EXPONENT_BASE:-2.0}"

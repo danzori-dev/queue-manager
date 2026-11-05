@@ -25,25 +25,28 @@ type Renderer interface {
 }
 
 type QueueMessengerDeps struct {
-	Bot        *telego.Bot
-	Renderer   Renderer
-	APITimeout time.Duration
-	Log        *slog.Logger
+	Bot                         *telego.Bot
+	Renderer                    Renderer
+	APITimeout                  time.Duration
+	RemovalNotificationsEnabled bool
+	Log                         *slog.Logger
 }
 
 type QueueMessenger struct {
-	bot        *telego.Bot
-	render     Renderer
-	apiTimeout time.Duration
-	log        *slog.Logger
+	bot                         *telego.Bot
+	render                      Renderer
+	apiTimeout                  time.Duration
+	removalNotificationsEnabled bool
+	log                         *slog.Logger
 }
 
 func NewQueueMessenger(d QueueMessengerDeps) *QueueMessenger {
 	return &QueueMessenger{
-		bot:        d.Bot,
-		render:     d.Renderer,
-		apiTimeout: d.APITimeout,
-		log:        d.Log,
+		bot:                         d.Bot,
+		render:                      d.Renderer,
+		apiTimeout:                  d.APITimeout,
+		removalNotificationsEnabled: d.RemovalNotificationsEnabled,
+		log:                         d.Log,
 	}
 }
 
@@ -128,6 +131,10 @@ func (m *QueueMessenger) Delete(ctx context.Context, event domain.Event) error {
 }
 
 func (m *QueueMessenger) AnnounceRemoval(ctx context.Context, removal appqueue.Removal) {
+	if !m.removalNotificationsEnabled {
+		return
+	}
+
 	reqCtx, cancel := context.WithTimeout(ctx, m.apiTimeout)
 	defer cancel()
 
