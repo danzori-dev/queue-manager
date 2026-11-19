@@ -23,64 +23,11 @@ func NewEntryRepository(db *sql.DB, timeout time.Duration) *EntryRepository {
 }
 
 func (r *EntryRepository) Add(ctx context.Context, eventID, userID int64, username string) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
+	return r.add(ctx, eventID, userID, username, "")
+}
 
-	const (
-		eventQuery = `
-			SELECT id
-			FROM events
-			WHERE id = ?
-		`
-
-		insertQuery = `
-			INSERT INTO queue_entries (event_id, user_id, username, sort_key)
-			SELECT ?, ?, ?, coalesce(max(sort_key), 0) + 1
-			FROM queue_entries
-			WHERE event_id = ?
-			ON CONFLICT (event_id, user_id) DO NOTHING
-			RETURNING id
-		`
-	)
-
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, fmt.Errorf("begin tx: %w", err)
-	}
-
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	var existingID int64
-
-	err = tx.QueryRowContext(ctx, eventQuery, eventID).Scan(&existingID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, domain.ErrEventNotFound
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("query entry event: %w", err)
-	}
-
-	var id int64
-
-	err = tx.
-		QueryRowContext(ctx, insertQuery, eventID, userID, username, eventID).
-		Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("insert entry: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return false, fmt.Errorf("commit tx: %w", err)
-	}
-
-	return true, nil
+func (r *EntryRepository) AddToOpenEvent(ctx context.Context, eventID, userID int64, username string) (bool, error) {
+	return r.add(ctx, eventID, userID, username, domain.StatusOpen)
 }
 
 func (r *EntryRepository) Remove(ctx context.Context, eventID, userID int64) (bool, error) {
@@ -460,6 +407,73 @@ func (r *EntryRepository) JoinPlace(ctx context.Context, eventID, userID int64, 
 	}
 
 	return nil
+}
+
+func (r *EntryRepository) add(ctx context.Context, eventID, userID int64, username string, requiredStatus domain.Status) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	const insertQuery = `
+		INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+		SELECT e.id, ?, ?, coalesce((
+            SELECT max(q.sort_key)
+            FROM queue_entries AS q
+            WHERE q.event_id = e.id
+		), 0) + 1
+		FROM events AS e
+		WHERE e.id = ? AND (? = '' OR e.status = ?)
+		ON CONFLICT (event_id, user_id) DO NOTHING
+		RETURNING id
+	`
+
+	var id int64
+
+	err := r.db.
+		QueryRowContext(ctx, insertQuery, userID, username, eventID, requiredStatus, requiredStatus).
+		Scan(&id)
+	if err == nil {
+		return true, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return false, fmt.Errorf("insert entry: %w", err)
+	}
+
+	const eventQuery = `
+		SELECT status, exists(
+            SELECT 1
+            FROM queue_entries AS q
+            WHERE q.event_id = e.id AND q.user_id = ?
+		)
+		FROM events AS e
+		WHERE id = ?
+	`
+
+	var (
+		status        domain.Status
+		alreadyJoined bool
+	)
+
+	err = r.db.
+		QueryRowContext(ctx, eventQuery, userID, eventID).
+		Scan(&status, &alreadyJoined)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, domain.ErrEventNotFound
+		}
+
+		return false, fmt.Errorf("query entry event: %w", err)
+	}
+
+	if requiredStatus != "" && status != requiredStatus {
+		return false, domain.ErrEventClosed
+	}
+
+	if alreadyJoined {
+		return false, nil
+	}
+
+	return false, errors.New("queue entry was not added")
 }
 
 func carryEventInTx(ctx context.Context, tx *sql.Tx, eventID int64) (domain.Event, error) {

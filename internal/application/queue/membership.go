@@ -11,11 +11,7 @@ import (
 )
 
 func (s *Service) Join(ctx context.Context, eventID, userID int64, username string) (JoinResult, error) {
-	if _, err := s.loadOpenEvent(ctx, eventID); err != nil {
-		return JoinResult{}, err
-	}
-
-	added, err := s.entries.Add(ctx, eventID, userID, username)
+	added, err := s.entries.AddToOpenEvent(ctx, eventID, userID, username)
 	if err != nil {
 		return JoinResult{}, fmt.Errorf("add entry: %w", err)
 	}

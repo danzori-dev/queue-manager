@@ -49,6 +49,10 @@ func RateLimit(student, admin RateLimitConfig, bot *telego.Bot, apiTimeout time.
 	}
 
 	return func(ctx *th.Context, update telego.Update) error {
+		if msg := update.Message; msg != nil && msg.Chat.Type != telego.ChatTypePrivate && !th.CommandRegexp.MatchString(msg.Text) {
+			return ctx.Next(update)
+		}
+
 		userID := extractUserID(update)
 		role := RoleFromContext(ctx)
 
