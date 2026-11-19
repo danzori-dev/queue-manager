@@ -24,6 +24,7 @@ type EventRepository interface {
 
 type EntryRepository interface {
 	Add(ctx context.Context, eventID, userID int64, username string) (bool, error)
+	AddToOpenEvent(ctx context.Context, eventID, userID int64, username string) (bool, error)
 	Remove(ctx context.Context, eventID, userID int64) (bool, error)
 	Position(ctx context.Context, eventID, userID int64) (int, error)
 	List(ctx context.Context, eventID int64) ([]domain.Entry, error)
