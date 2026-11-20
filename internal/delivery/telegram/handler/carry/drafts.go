@@ -13,6 +13,7 @@ const carryDraftTTL = 5 * time.Minute
 var (
 	errCarryExpired    = errors.New("carry draft expired")
 	errCarryProcessing = errors.New("carry draft is being processed")
+	errNoCarryTitle    = errors.New("carry draft is not waiting for a title")
 )
 
 type carryDraft struct {
@@ -26,6 +27,9 @@ type carryDraft struct {
 	chatID         int64
 	messageID      int
 	confirmationID int64
+
+	newQueue      bool
+	awaitingTitle bool
 
 	plan       *appqueue.CarryPlan
 	createdAt  time.Time
@@ -95,6 +99,31 @@ func (d *carryDrafts) Begin(adminID, chatID int64, messageID int, confirmationID
 	return draft, nil
 }
 
+func (d *carryDrafts) BeginTitle(adminID, chatID int64) (carryDraft, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	draft, ok := d.drafts[adminID]
+	if !ok || draft.chatID != chatID || !draft.awaitingTitle {
+		return carryDraft{}, errNoCarryTitle
+	}
+
+	if draft.processing {
+		return carryDraft{}, errCarryProcessing
+	}
+
+	if time.Since(draft.createdAt) > carryDraftTTL {
+		delete(d.drafts, adminID)
+
+		return carryDraft{}, errCarryExpired
+	}
+
+	draft.processing = true
+	d.drafts[adminID] = draft
+
+	return draft, nil
+}
+
 func (d *carryDrafts) Save(adminID int64, draft carryDraft) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -126,4 +155,5 @@ func (d *carryDraft) setPlan(plan appqueue.CarryPlan) {
 	d.toID = plan.To.ID
 	d.plan = &plan
 	d.confirmationID++
+	d.awaitingTitle = false
 }

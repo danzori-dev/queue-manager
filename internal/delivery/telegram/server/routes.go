@@ -63,9 +63,19 @@ func RegisterRoutes(p RouteParams) Register {
 				callback.ActionKick, callback.ActionMembers, callback.ActionParticipantCandidates, callback.ActionParticipantAdd,
 			),
 		)
-		private.HandleMessage(p.Handlers.Menu.Text, th.AnyMessageWithText(), th.Not(th.AnyCommand()))
+		private.HandleMessage(
+			func(ctx *th.Context, msg telego.Message) error {
+				handled, err := p.Handlers.Carry.NewTitle(ctx, msg)
+				if handled || err != nil {
+					return err
+				}
+
+				return p.Handlers.Menu.Text(ctx, msg)
+			}, th.AnyMessageWithText(), th.Not(th.AnyCommand()),
+		)
 
 		private.HandleMessage(p.Handlers.Carry.Carry, th.CommandEqual("carry"))
+		private.HandleMessage(p.Handlers.Carry.CarryNew, th.CommandEqual("carry_new"))
 		bh.HandleCallbackQuery(
 			p.Handlers.Carry.Callback, th.AnyCallbackQueryWithMessage(), actions(
 				callback.ActionCarrySource, callback.ActionCarrySourcesPage, callback.ActionCarryPlace, callback.ActionCarryPlacesPage,

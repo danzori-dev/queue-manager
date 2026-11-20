@@ -184,15 +184,28 @@ func CarryCancel(fromID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID int64) (*telego.InlineKeyboardMarkup, Page) {
-	var (
-		fromPos    int
-		placeCount int
-	)
+func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID int64, newQueue bool) (*telego.InlineKeyboardMarkup, Page) {
+	var fromPos, placeCount int
 
 	if len(plan.Lines) > 0 {
 		fromPos = plan.Lines[0].Position
 		placeCount = plan.Lines[len(plan.Lines)-1].Position - fromPos + 1
+	}
+
+	label := texts.ButtonCarry
+	back := callback.Action{
+		Kind:           callback.ActionCarryTargetsPage,
+		EventID:        plan.From.ID,
+		Position:       fromPos,
+		Page:           targetPage,
+		ConfirmationID: confirmationID,
+	}
+
+	if newQueue {
+		label = texts.ButtonCarryNew
+		back.Kind = callback.ActionCarryPlacesPage
+		back.Position = 0
+		back.Page = PageOf(fromPos - 1)
 	}
 
 	p := paginate(placeCount, requested, pageSize)
@@ -213,7 +226,7 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 		rows,
 		tu.InlineKeyboardRow(
 			button(
-				texts.ButtonCarry, callback.Action{
+				label, callback.Action{
 					Kind:           callback.ActionCarry,
 					EventID:        plan.From.ID,
 					ConfirmationID: confirmationID,
@@ -227,17 +240,7 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 				},
 			).WithStyle(telego.ButtonStyleDanger),
 		),
-		tu.InlineKeyboardRow(
-			button(
-				texts.ButtonBack, callback.Action{
-					Kind:           callback.ActionCarryTargetsPage,
-					EventID:        plan.From.ID,
-					Position:       fromPos,
-					Page:           targetPage,
-					ConfirmationID: confirmationID,
-				},
-			),
-		),
+		tu.InlineKeyboardRow(button(texts.ButtonBack, back)),
 	)
 
 	return tu.InlineKeyboard(rows...), p

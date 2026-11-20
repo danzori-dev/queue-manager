@@ -142,7 +142,7 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 }
 
 func (s *Service) publishCreatedEvent(ctx context.Context, actorID int64, view View) error {
-	messageID, err := s.messages.Publish(ctx, View{Event: view.Event})
+	messageID, err := s.messages.Publish(ctx, view)
 	if err != nil {
 		return errors.Join(
 			fmt.Errorf("publish event: %w", err),

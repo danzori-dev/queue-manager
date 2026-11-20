@@ -18,9 +18,13 @@ const (
 	CarryPosition     = "В исходной очереди нет такого места."
 	CarryChanged      = "Состав очереди изменился. Проверь обновлённый предпросмотр и подтверди перенос ещё раз."
 
-	ButtonCarry = "Перенести"
+	CarryNewTitlePrompt = "Введите название новой очереди"
+
+	ButtonCarry    = "Перенести"
+	ButtonCarryNew = "Создать очередь"
 
 	CarryExpired    = "Меню переноса устарело. Отправь /carry ещё раз."
+	CarryNewExpired = "Меню переноса устарело. Отправь /carry_new ещё раз."
 	CarryProcessing = "Предыдущее действие еще обрабатывается."
 	CarryCanceled   = "Перенос отменён."
 	CarryDoneAnswer = "Готово. Перенос выполнен."

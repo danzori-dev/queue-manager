@@ -12,5 +12,7 @@ type QueueService interface {
 	CarrySource(ctx context.Context, fromID int64) (appqueue.View, error)
 	CarryTargets(ctx context.Context, fromID int64, fromPos int) ([]domain.Event, error)
 	PlanCarry(ctx context.Context, fromID int64, fromPos int, toID int64) (appqueue.CarryPlan, error)
+	PlanCarryNew(ctx context.Context, fromID int64, fromPos int, title string) (appqueue.CarryPlan, error)
 	Carry(ctx context.Context, plan appqueue.CarryPlan, actorID int64) (int, error)
+	CreateCarriedEvent(ctx context.Context, plan appqueue.CarryPlan, actorID int64) error
 }

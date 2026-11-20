@@ -32,42 +32,11 @@ func New(replier *reply.Replier, queues QueueService) *Handler {
 }
 
 func (h *Handler) Carry(ctx *th.Context, msg telego.Message) error {
-	if ok, err := h.reply.Allowed(ctx, msg, access.RoleAdmin); !ok {
-		return err
-	}
+	return h.startCarry(ctx, msg, false)
+}
 
-	draft, err := h.carries.Start(msg.From.ID, msg.Chat.ID)
-	if err != nil {
-		return h.reply.SendHTML(ctx, msg, texts.CarryProcessing)
-	}
-
-	events, err := h.queues.CarrySources(ctx)
-	if err != nil {
-		h.carries.Delete(msg.From.ID)
-
-		return err
-	}
-
-	if len(events) == 0 {
-		err := h.reply.SendHTML(ctx, msg, texts.CarrySourcesEmpty)
-		h.carries.Delete(msg.From.ID)
-
-		return err
-	}
-
-	kb, p := keyboard.CarrySources(events, 0, 0)
-
-	messageID, err := h.reply.SendMenuWithID(ctx, msg, texts.CarryChooseSource(p.Index, p.Count), kb)
-	if err != nil {
-		h.carries.Delete(msg.From.ID)
-
-		return err
-	}
-
-	draft.messageID = messageID
-	h.carries.Save(msg.From.ID, draft)
-
-	return nil
+func (h *Handler) CarryNew(ctx *th.Context, msg telego.Message) error {
+	return h.startCarry(ctx, msg, true)
 }
 
 func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
@@ -108,6 +77,46 @@ func (h *Handler) Callback(ctx *th.Context, query telego.CallbackQuery) error {
 	return h.reply.Answer(ctx, query, text)
 }
 
+func (h *Handler) startCarry(ctx *th.Context, msg telego.Message, newQueue bool) error {
+	if ok, err := h.reply.Allowed(ctx, msg, access.RoleAdmin); !ok {
+		return err
+	}
+
+	draft, err := h.carries.Start(msg.From.ID, msg.Chat.ID)
+	if err != nil {
+		return h.reply.SendHTML(ctx, msg, texts.CarryProcessing)
+	}
+
+	events, err := h.queues.CarrySources(ctx)
+	if err != nil {
+		h.carries.Delete(msg.From.ID)
+
+		return err
+	}
+
+	if len(events) == 0 {
+		err := h.reply.SendHTML(ctx, msg, texts.CarrySourcesEmpty)
+		h.carries.Delete(msg.From.ID)
+
+		return err
+	}
+
+	kb, p := keyboard.CarrySources(events, 0, 0)
+
+	messageID, err := h.reply.SendMenuWithID(ctx, msg, texts.CarryChooseSource(p.Index, p.Count), kb)
+	if err != nil {
+		h.carries.Delete(msg.From.ID)
+
+		return err
+	}
+
+	draft.messageID = messageID
+	draft.newQueue = newQueue
+	h.carries.Save(msg.From.ID, draft)
+
+	return nil
+}
+
 func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, draft *carryDraft, a callback.Action) (string, error) {
 	var err error
 
@@ -125,7 +134,11 @@ func (h *Handler) applyAction(ctx context.Context, query telego.CallbackQuery, d
 	case callback.ActionCarryPlace:
 		draft.resetPlan()
 
-		err = h.showTargets(ctx, query, draft, a.EventID, a.Position, 0)
+		if draft.newQueue {
+			err = h.requestNewTitle(ctx, query, draft, a.EventID, a.Position)
+		} else {
+			err = h.showTargets(ctx, query, draft, a.EventID, a.Position, 0)
+		}
 
 	case callback.ActionCarryTargetsPage:
 		draft.resetPlan()
@@ -253,6 +266,10 @@ func (h *Handler) confirm(ctx context.Context, query telego.CallbackQuery, draft
 		return texts.CarryExpired, nil
 	}
 
+	if draft.newQueue {
+		return h.confirmNew(ctx, query, draft)
+	}
+
 	moved, err := h.queues.Carry(ctx, *draft.plan, query.From.ID)
 	if errors.Is(err, domain.ErrCarryChanged) {
 		toID := draft.toID
@@ -297,23 +314,9 @@ func (h *Handler) cancel(ctx context.Context, query telego.CallbackQuery, draft 
 }
 
 func (h *Handler) renderPlan(ctx context.Context, query telego.CallbackQuery, draft *carryDraft, page int) error {
-	plan := *draft.plan
+	text, kb := planMenu(draft, page)
 
-	kb, p := keyboard.Carry(plan, draft.targetsPage, page, draft.confirmationID)
-	start, end := p.Bounds()
-
-	firstPosition := plan.Lines[0].Position
-	lines := make([]appqueue.Line, 0)
-
-	for _, line := range plan.Lines {
-		index := line.Position - firstPosition
-
-		if index >= start && index < end {
-			lines = append(lines, line)
-		}
-	}
-
-	return h.reply.EditMenu(ctx, query, texts.CarryPlan(plan, lines, p.Index, p.Count), kb)
+	return h.reply.EditMenu(ctx, query, text, kb)
 }
 
 func (h *Handler) stepFailed(ctx context.Context, query telego.CallbackQuery, draft *carryDraft, err error) error {
@@ -325,6 +328,32 @@ func (h *Handler) stepFailed(ctx context.Context, query telego.CallbackQuery, dr
 	draft.resetPlan()
 
 	return h.reply.EditMenu(ctx, query, text, keyboard.CarryBackToSources(draft.fromID, draft.sourcesPage))
+}
+
+func planMenu(draft *carryDraft, page int) (string, *telego.InlineKeyboardMarkup) {
+	plan := *draft.plan
+
+	kb, p := keyboard.Carry(plan, draft.targetsPage, page, draft.confirmationID, draft.newQueue)
+	start, end := p.Bounds()
+
+	firstPosition := plan.Lines[0].Position
+	lines := make([]appqueue.Line, 0)
+
+	for _, line := range plan.Lines {
+		index := line.Position - firstPosition
+
+		if index < start || index >= end {
+			continue
+		}
+
+		if draft.newQueue {
+			line.Position = index + 1
+		}
+
+		lines = append(lines, line)
+	}
+
+	return texts.CarryPlan(plan, lines, p.Index, p.Count), kb
 }
 
 func errorText(err error) (string, bool) {
