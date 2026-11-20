@@ -86,6 +86,9 @@ linters:
                 - fieldalignment
                 - shadow # It’s not always a mistake.
 
+        interfacebloat:
+            max: 11
+
         makezero:
             # Allow only slices initialized with a length of zero.
             # Default: false

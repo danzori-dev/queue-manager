@@ -66,10 +66,14 @@ func (r *Replier) SendMenuWithID(ctx context.Context, msg telego.Message, text s
 }
 
 func (r *Replier) EditMenu(ctx context.Context, query telego.CallbackQuery, text string, kb *telego.InlineKeyboardMarkup) error {
+	return r.EditMenuMessage(ctx, query.Message.GetChat().ID, query.Message.GetMessageID(), text, kb)
+}
+
+func (r *Replier) EditMenuMessage(ctx context.Context, chatID int64, messageID int, text string, kb *telego.InlineKeyboardMarkup) error {
 	reqCtx, cancel := context.WithTimeout(ctx, r.apiTimeout)
 	defer cancel()
 
-	params := tu.EditMessageText(tu.ID(query.Message.GetChat().ID), query.Message.GetMessageID(), text).
+	params := tu.EditMessageText(tu.ID(chatID), messageID, text).
 		WithParseMode(telego.ModeHTML).
 		WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true})
 

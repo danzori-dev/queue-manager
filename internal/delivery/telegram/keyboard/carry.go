@@ -65,8 +65,8 @@ func CarryPlaces(view appqueue.View, requested, sourcesPage int) (*telego.Inline
 	for _, place := range places[p.start:p.end] {
 		names := make([]string, 0, len(place))
 
-		for i, line := range place {
-			names[i] = line.Name
+		for _, line := range place {
+			names = append(names, line.Name)
 		}
 
 		label := fmt.Sprintf("%d. %s", place[0].Position, strings.Join(names, ", "))
@@ -184,11 +184,11 @@ func CarryCancel(fromID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID int64) (*telego.InlineKeyboardMarkup, Page) {
-	var (
-		fromPos    int
-		placeCount int
-	)
+func Carry(
+	plan appqueue.CarryPlan, requested int,
+	confirmationID int64, label string, back callback.Action,
+) (*telego.InlineKeyboardMarkup, Page) {
+	var fromPos, placeCount int
 
 	if len(plan.Lines) > 0 {
 		fromPos = plan.Lines[0].Position
@@ -213,7 +213,7 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 		rows,
 		tu.InlineKeyboardRow(
 			button(
-				texts.ButtonCarry, callback.Action{
+				label, callback.Action{
 					Kind:           callback.ActionCarry,
 					EventID:        plan.From.ID,
 					ConfirmationID: confirmationID,
@@ -227,17 +227,7 @@ func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID in
 				},
 			).WithStyle(telego.ButtonStyleDanger),
 		),
-		tu.InlineKeyboardRow(
-			button(
-				texts.ButtonBack, callback.Action{
-					Kind:           callback.ActionCarryTargetsPage,
-					EventID:        plan.From.ID,
-					Position:       fromPos,
-					Page:           targetPage,
-					ConfirmationID: confirmationID,
-				},
-			),
-		),
+		tu.InlineKeyboardRow(button(texts.ButtonBack, back)),
 	)
 
 	return tu.InlineKeyboard(rows...), p

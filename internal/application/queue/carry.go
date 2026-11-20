@@ -85,21 +85,39 @@ func (s *Service) PlanCarry(ctx context.Context, fromID int64, fromPos int, toID
 	}, nil
 }
 
+func (s *Service) PlanCarryNew(ctx context.Context, fromID int64, fromPos int, title string) (CarryPlan, error) {
+	title, err := domain.NormalizeTitle(title)
+	if err != nil {
+		return CarryPlan{}, err
+	}
+
+	source, err := s.CarrySource(ctx, fromID)
+	if err != nil {
+		return CarryPlan{}, err
+	}
+
+	start := slices.IndexFunc(
+		source.Lines, func(line Line) bool {
+			return line.Position == fromPos
+		},
+	)
+	if start < 0 {
+		return CarryPlan{}, domain.ErrCarryPosition
+	}
+
+	return CarryPlan{
+		From:  source.Event,
+		To:    domain.Event{Title: title},
+		Lines: source.Lines[start:],
+	}, nil
+}
+
 func (s *Service) Carry(ctx context.Context, plan CarryPlan, actorID int64) (int, error) {
 	if len(plan.Lines) == 0 {
 		return 0, domain.ErrCarryPosition
 	}
 
-	places := make([][]int64, 0)
-
-	for i, line := range plan.Lines {
-		if i == 0 || line.Position != plan.Lines[i-1].Position {
-			places = append(places, nil)
-		}
-
-		last := len(places) - 1
-		places[last] = append(places[last], line.UserID)
-	}
+	places := carryPlaceIDs(plan.Lines)
 
 	moved, err := s.entries.Prepend(ctx, plan.From.ID, plan.To.ID, plan.Lines[0].Position, places)
 	if err != nil {
@@ -115,6 +133,54 @@ func (s *Service) Carry(ctx context.Context, plan CarryPlan, actorID int64) (int
 	)
 
 	return moved, nil
+}
+
+func (s *Service) CreateCarriedEvent(ctx context.Context, plan CarryPlan, actorID int64) error {
+	if len(plan.Lines) == 0 {
+		return domain.ErrCarryPosition
+	}
+
+	target, err := s.targets.Target(ctx)
+	if err != nil {
+		return fmt.Errorf("get queue target: %w", err)
+	}
+
+	event, err := domain.NewEvent(target, plan.To.Title)
+	if err != nil {
+		return err
+	}
+
+	id, entries, err := s.events.CreateWithCarry(
+		ctx, event, domain.CarrySelection{
+			FromID:  plan.From.ID,
+			FromPos: plan.Lines[0].Position,
+			Places:  carryPlaceIDs(plan.Lines),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("create queue with carried entries: %w", err)
+	}
+
+	event.ID = id
+
+	err = s.publishCreatedEvent(
+		ctx, actorID, View{
+			Event: event,
+			Lines: s.lines(entries, 1),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	s.audit(
+		ctx, actorID, ActionEventCarriedOver,
+		slog.Int64(AttrFromEventID, plan.From.ID),
+		slog.Int64(AttrToEventID, event.ID),
+		slog.Int(AttrCount, len(entries)),
+	)
+
+	return nil
 }
 
 type carryInput struct {
@@ -154,4 +220,19 @@ func (s *Service) carry(ctx context.Context, fromID int64, fromPos int, toID int
 		to:      to,
 		entries: slices.Concat(places[fromPos-1:]...),
 	}, nil
+}
+
+func carryPlaceIDs(lines []Line) [][]int64 {
+	var places [][]int64
+
+	for i, line := range lines {
+		if i == 0 || line.Position != lines[i-1].Position {
+			places = append(places, nil)
+		}
+
+		last := len(places) - 1
+		places[last] = append(places[last], line.UserID)
+	}
+
+	return places
 }

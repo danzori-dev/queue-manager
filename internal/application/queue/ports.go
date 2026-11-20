@@ -11,6 +11,7 @@ import (
 
 type EventRepository interface {
 	Create(ctx context.Context, event domain.Event) (int64, error)
+	CreateWithCarry(ctx context.Context, event domain.Event, selection domain.CarrySelection) (int64, []domain.Entry, error)
 	Get(ctx context.Context, eventID int64) (domain.Event, error)
 	List(ctx context.Context) ([]domain.Event, error)
 	ListOpenIDs(ctx context.Context) ([]int64, error)

@@ -42,6 +42,91 @@ func (r *EventRepository) Create(ctx context.Context, event domain.Event) (int64
 	return id, nil
 }
 
+func (r *EventRepository) CreateWithCarry(ctx context.Context, event domain.Event, selection domain.CarrySelection) (
+	int64, []domain.Entry, error,
+) {
+	if selection.FromPos < 1 || len(selection.Places) == 0 {
+		return 0, nil, domain.ErrCarryPosition
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, nil, fmt.Errorf("begin tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	source, err := carryEventInTx(ctx, tx, selection.FromID)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if source.Status != domain.StatusClosed {
+		return 0, nil, domain.ErrCarrySourceOpen
+	}
+
+	entries, err := carryEntriesInTx(ctx, tx, selection.FromID)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	places := domain.Places(entries)
+	if selection.FromPos > len(places) {
+		return 0, nil, domain.ErrCarryPosition
+	}
+
+	selected := places[selection.FromPos-1:]
+	if !sameCarryPlaces(selected, selection.Places) {
+		return 0, nil, domain.ErrCarryChanged
+	}
+
+	const insertEvent = `
+		INSERT INTO events (chat_id, thread_id, title, status)
+		VALUES (?, ?, ?, ?)
+		RETURNING id
+	`
+
+	var id int64
+
+	err = tx.
+		QueryRowContext(ctx, insertEvent, event.ChatID, event.ThreadID, event.Title, string(event.Status)).
+		Scan(&id)
+	if err != nil {
+		return 0, nil, fmt.Errorf("insert event: %w", err)
+	}
+
+	const insertEntry = `
+		INSERT INTO queue_entries (event_id, user_id, username, sort_key)
+		VALUES (?, ?, ?, ?)
+	`
+
+	var copied []domain.Entry
+
+	for i, place := range selected {
+		for _, entry := range place {
+			entry.SortKey = int64(i + 1)
+
+			_, err := tx.ExecContext(ctx, insertEntry, id, entry.UserID, entry.Username, entry.SortKey)
+			if err != nil {
+				return 0, nil, fmt.Errorf("insert carried entry: %w", err)
+			}
+
+			copied = append(copied, entry)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return id, copied, nil
+}
+
 func (r *EventRepository) Get(ctx context.Context, eventID int64) (domain.Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

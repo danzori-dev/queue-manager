@@ -45,30 +45,7 @@ func (s *Service) CreateEvent(ctx context.Context, actorID int64, title string) 
 		return fmt.Errorf("create event: %w", err)
 	}
 
-	messageID, err := s.messages.Publish(ctx, View{Event: event})
-	if err != nil {
-		return errors.Join(
-			fmt.Errorf("publish event: %w", err),
-			s.rollbackCreatedEvent(ctx, event),
-		)
-	}
-
-	event.MessageID = messageID
-
-	if err := s.saveMessageID(ctx, event.ID, messageID); err != nil {
-		return errors.Join(
-			fmt.Errorf("save message id: %w", err),
-			s.rollbackCreatedEvent(ctx, event),
-		)
-	}
-
-	s.audit(
-		ctx, actorID, ActionEventCreated,
-		slog.Int64(AttrEventID, event.ID),
-		slog.String(AttrTitle, event.Title),
-	)
-
-	return nil
+	return s.publishCreatedEvent(ctx, actorID, View{Event: event})
 }
 
 func (s *Service) RenameEvent(ctx context.Context, eventID, actorID int64, title string) error {
@@ -159,6 +136,33 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 		ctx, actorID, ActionEventDeleted,
 		slog.Int64(AttrEventID, eventID),
 		slog.String(AttrTitle, event.Title),
+	)
+
+	return nil
+}
+
+func (s *Service) publishCreatedEvent(ctx context.Context, actorID int64, view View) error {
+	messageID, err := s.messages.Publish(ctx, view)
+	if err != nil {
+		return errors.Join(
+			fmt.Errorf("publish event: %w", err),
+			s.rollbackCreatedEvent(ctx, view.Event),
+		)
+	}
+
+	view.Event.MessageID = messageID
+
+	if err := s.saveMessageID(ctx, view.Event.ID, messageID); err != nil {
+		return errors.Join(
+			fmt.Errorf("save message id: %w", err),
+			s.rollbackCreatedEvent(ctx, view.Event),
+		)
+	}
+
+	s.audit(
+		ctx, actorID, ActionEventCreated,
+		slog.Int64(AttrEventID, view.Event.ID),
+		slog.String(AttrTitle, view.Event.Title),
 	)
 
 	return nil
