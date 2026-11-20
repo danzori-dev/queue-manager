@@ -149,11 +149,11 @@ func (d *carryDraft) resetPlan() {
 	d.toID = 0
 	d.plan = nil
 	d.confirmationID++
+	d.awaitingTitle = false
 }
 
 func (d *carryDraft) setPlan(plan appqueue.CarryPlan) {
 	d.toID = plan.To.ID
 	d.plan = &plan
 	d.confirmationID++
-	d.awaitingTitle = false
 }

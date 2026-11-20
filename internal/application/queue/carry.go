@@ -176,7 +176,7 @@ func (s *Service) CreateCarriedEvent(ctx context.Context, plan CarryPlan, actorI
 	s.audit(
 		ctx, actorID, ActionEventCarriedOver,
 		slog.Int64(AttrFromEventID, plan.From.ID),
-		slog.Int64(AttrToEventID, plan.To.ID),
+		slog.Int64(AttrToEventID, event.ID),
 		slog.Int(AttrCount, len(entries)),
 	)
 
