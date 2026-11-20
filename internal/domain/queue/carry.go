@@ -1,5 +1,11 @@
 package queue
 
+type CarrySelection struct {
+	FromID  int64
+	FromPos int
+	Places  [][]int64
+}
+
 func CanCarry(from, to Event) error {
 	switch {
 	case from.ID == to.ID:

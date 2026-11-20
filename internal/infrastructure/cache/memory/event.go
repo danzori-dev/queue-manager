@@ -10,6 +10,7 @@ import (
 
 type EventRepository interface {
 	Create(ctx context.Context, event domain.Event) (int64, error)
+	CreateWithCarry(ctx context.Context, event domain.Event, selection domain.CarrySelection) (int64, []domain.Entry, error)
 	Get(ctx context.Context, eventID int64) (domain.Event, error)
 	List(ctx context.Context) ([]domain.Event, error)
 	ListOpenIDs(ctx context.Context) ([]int64, error)
@@ -48,6 +49,23 @@ func (c *EventCache) Create(ctx context.Context, event domain.Event) (int64, err
 	c.events[id] = event
 
 	return id, nil
+}
+
+func (c *EventCache) CreateWithCarry(ctx context.Context, event domain.Event, selection domain.CarrySelection) (
+	int64, []domain.Entry, error,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	id, entries, err := c.inner.CreateWithCarry(ctx, event, selection)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	event.ID = id
+	c.events[id] = event
+
+	return id, entries, nil
 }
 
 func (c *EventCache) Get(ctx context.Context, eventID int64) (domain.Event, error) {
