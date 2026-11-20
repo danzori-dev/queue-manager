@@ -184,28 +184,15 @@ func CarryCancel(fromID int64) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func Carry(plan appqueue.CarryPlan, targetPage, requested int, confirmationID int64, newQueue bool) (*telego.InlineKeyboardMarkup, Page) {
+func Carry(
+	plan appqueue.CarryPlan, requested int,
+	confirmationID int64, label string, back callback.Action,
+) (*telego.InlineKeyboardMarkup, Page) {
 	var fromPos, placeCount int
 
 	if len(plan.Lines) > 0 {
 		fromPos = plan.Lines[0].Position
 		placeCount = plan.Lines[len(plan.Lines)-1].Position - fromPos + 1
-	}
-
-	label := texts.ButtonCarry
-	back := callback.Action{
-		Kind:           callback.ActionCarryTargetsPage,
-		EventID:        plan.From.ID,
-		Position:       fromPos,
-		Page:           targetPage,
-		ConfirmationID: confirmationID,
-	}
-
-	if newQueue {
-		label = texts.ButtonCarryNew
-		back.Kind = callback.ActionCarryPlacesPage
-		back.Position = 0
-		back.Page = PageOf(fromPos - 1)
 	}
 
 	p := paginate(placeCount, requested, pageSize)

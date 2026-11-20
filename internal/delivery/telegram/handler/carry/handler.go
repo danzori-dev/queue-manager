@@ -332,11 +332,27 @@ func (h *Handler) stepFailed(ctx context.Context, query telego.CallbackQuery, dr
 
 func planMenu(draft *carryDraft, page int) (string, *telego.InlineKeyboardMarkup) {
 	plan := *draft.plan
+	firstPosition := plan.Lines[0].Position
 
-	kb, p := keyboard.Carry(plan, draft.targetsPage, page, draft.confirmationID, draft.newQueue)
+	label := texts.ButtonCarry
+	back := callback.Action{
+		Kind:           callback.ActionCarryTargetsPage,
+		EventID:        plan.From.ID,
+		Position:       firstPosition,
+		Page:           draft.targetsPage,
+		ConfirmationID: draft.confirmationID,
+	}
+
+	if draft.newQueue {
+		label = texts.ButtonCarryNew
+		back.Kind = callback.ActionCarryPlacesPage
+		back.Position = 0
+		back.Page = keyboard.PageOf(firstPosition - 1)
+	}
+
+	kb, p := keyboard.Carry(plan, page, draft.confirmationID, label, back)
 	start, end := p.Bounds()
 
-	firstPosition := plan.Lines[0].Position
 	lines := make([]appqueue.Line, 0)
 
 	for _, line := range plan.Lines {
