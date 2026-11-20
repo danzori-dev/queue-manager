@@ -65,8 +65,8 @@ func CarryPlaces(view appqueue.View, requested, sourcesPage int) (*telego.Inline
 	for _, place := range places[p.start:p.end] {
 		names := make([]string, 0, len(place))
 
-		for i, line := range place {
-			names[i] = line.Name
+		for _, line := range place {
+			names = append(names, line.Name)
 		}
 
 		label := fmt.Sprintf("%d. %s", place[0].Position, strings.Join(names, ", "))

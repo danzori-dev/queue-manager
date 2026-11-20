@@ -56,8 +56,8 @@ func CarryPlan(plan appqueue.CarryPlan, lines []appqueue.Line, page, pages int) 
 	for _, place := range groupPlaces(lines) {
 		names := make([]string, 0, len(place))
 
-		for i, line := range place {
-			names[i] = html.EscapeString(line.Name)
+		for _, line := range place {
+			names = append(names, html.EscapeString(line.Name))
 		}
 
 		fmt.Fprintf(&b, "\n%d. %s", place[0].Position, strings.Join(names, ", "))
