@@ -178,8 +178,21 @@ func (m *QueueMessenger) AskSwap(ctx context.Context, swap appqueue.Swap) (int, 
 
 	msg, err := m.bot.SendMessage(reqCtx, params)
 	if err != nil {
-		if apiErr, ok := errors.AsType[*ta.Error](err); ok && apiErr.ErrorCode == http.StatusForbidden {
-			return 0, domain.ErrUserUnreachable
+		if apiErr, ok := errors.AsType[*ta.Error](err); ok {
+			switch {
+			case apiErr.ErrorCode == http.StatusForbidden:
+				return 0, domain.ErrUserUnreachable
+			case apiErr.ErrorCode == http.StatusBadRequest && strings.Contains(apiErr.Description, "chat not found"):
+				m.log.WarnContext(
+					ctx, "swap request delivery failed",
+					slog.Int64("event_id", swap.Event.ID),
+					slog.Int64("target_user_id", swap.ToID),
+					slog.Int("telegram_error_code", apiErr.ErrorCode),
+					slog.String("telegram_error_description", apiErr.Description),
+				)
+
+				return 0, domain.ErrUserUnreachable
+			}
 		}
 
 		return 0, fmt.Errorf("send swap request: %w", err)
@@ -200,8 +213,21 @@ func (m *QueueMessenger) AskInvite(ctx context.Context, invite appqueue.Invite) 
 
 	msg, err := m.bot.SendMessage(reqCtx, params)
 	if err != nil {
-		if apiErr, ok := errors.AsType[*ta.Error](err); ok && apiErr.ErrorCode == http.StatusForbidden {
-			return 0, domain.ErrUserUnreachable
+		if apiErr, ok := errors.AsType[*ta.Error](err); ok {
+			switch {
+			case apiErr.ErrorCode == http.StatusForbidden:
+				return 0, domain.ErrUserUnreachable
+			case apiErr.ErrorCode == http.StatusBadRequest && strings.Contains(apiErr.Description, "chat not found"):
+				m.log.WarnContext(
+					ctx, "invite request delivery failed",
+					slog.Int64("event_id", invite.Event.ID),
+					slog.Int64("target_user_id", invite.ToID),
+					slog.Int("telegram_error_code", apiErr.ErrorCode),
+					slog.String("telegram_error_description", apiErr.Description),
+				)
+
+				return 0, domain.ErrUserUnreachable
+			}
 		}
 
 		return 0, fmt.Errorf("send invite: %w", err)
