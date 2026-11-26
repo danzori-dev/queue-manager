@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -118,25 +119,53 @@ func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error
 		return err
 	}
 
-	if err := s.events.Delete(ctx, eventID); err != nil {
-		return fmt.Errorf("delete event: %w", err)
+	if event.MessageID == 0 {
+		return s.deleteEvent(ctx, event, actorID)
 	}
 
-	if err := s.messages.Delete(ctx, event); err != nil {
+	view, err := s.view(ctx, event)
+	if err != nil {
+		return fmt.Errorf("load event view before deletion: %w", err)
+	}
+
+	if err := s.deleteEvent(ctx, event, actorID); err != nil {
+		return err
+	}
+
+	view.Event.Status = domain.StatusClosed
+
+	const maxEditAttempts = 3
+
+	var (
+		retryAfter time.Duration
+		editErr    error
+	)
+
+retryEdit:
+	for attempt := 1; attempt <= maxEditAttempts; attempt++ {
+		retryAfter, editErr = s.messages.Edit(ctx, view)
+		if editErr != nil || retryAfter <= 0 || attempt == maxEditAttempts {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			editErr = ctx.Err()
+			break retryEdit
+		case <-time.After(retryAfter):
+		}
+	}
+
+	if (editErr != nil && !errors.Is(editErr, domain.ErrMessageNotFound)) || retryAfter > 0 {
 		s.log.WarnContext(
-			ctx, "delete queue message",
+			ctx, "edit queue message after event deletion",
 			slog.Int64(AttrEventID, event.ID),
 			slog.Int64("event_chat_id", event.ChatID),
 			slog.Int("message_id", event.MessageID),
-			slog.Any("err", err),
+			slog.Duration("retry_after", retryAfter),
+			slog.Any("err", editErr),
 		)
 	}
-
-	s.audit(
-		ctx, actorID, ActionEventDeleted,
-		slog.Int64(AttrEventID, eventID),
-		slog.String(AttrTitle, event.Title),
-	)
 
 	return nil
 }
@@ -184,6 +213,20 @@ func (s *Service) setStatus(ctx context.Context, eventID, actorID int64, status 
 
 	s.scheduler.Schedule(eventID)
 	s.audit(ctx, actorID, statusAction(status), slog.Int64(AttrEventID, eventID))
+
+	return nil
+}
+
+func (s *Service) deleteEvent(ctx context.Context, event domain.Event, actorID int64) error {
+	if err := s.events.Delete(ctx, event.ID); err != nil {
+		return fmt.Errorf("delete event: %w", err)
+	}
+
+	s.audit(
+		ctx, actorID, ActionEventDeleted,
+		slog.Int64(AttrEventID, event.ID),
+		slog.String(AttrTitle, event.Title),
+	)
 
 	return nil
 }

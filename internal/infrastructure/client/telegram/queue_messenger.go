@@ -95,11 +95,6 @@ func (m *QueueMessenger) Edit(ctx context.Context, view appqueue.View) (time.Dur
 			return 0, nil
 
 		case ok && strings.Contains(apiErr.Description, "message to edit not found"):
-			m.log.WarnContext(
-				ctx, "message to edit not found, republishing",
-				slog.Int64("event_id", view.Event.ID),
-			)
-
 			return 0, domain.ErrMessageNotFound
 		}
 

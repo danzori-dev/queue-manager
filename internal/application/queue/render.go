@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
@@ -31,6 +32,11 @@ func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration
 
 	retryAfter, err := s.messages.Edit(ctx, view)
 	if errors.Is(err, domain.ErrMessageNotFound) {
+		s.log.WarnContext(
+			ctx, "message to edit not found, republishing",
+			slog.Int64("event_id", view.Event.ID),
+		)
+
 		return 0, s.republish(ctx, view)
 	}
 
