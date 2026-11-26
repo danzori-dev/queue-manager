@@ -151,6 +151,7 @@ retryEdit:
 		select {
 		case <-ctx.Done():
 			editErr = ctx.Err()
+
 			break retryEdit
 		case <-time.After(retryAfter):
 		}
