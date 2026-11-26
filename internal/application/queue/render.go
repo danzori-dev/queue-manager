@@ -11,6 +11,9 @@ import (
 )
 
 func (s *Service) RenderEvent(ctx context.Context, eventID int64) (time.Duration, error) {
+	unlock := s.lockEventRender(eventID)
+	defer unlock()
+
 	event, err := s.events.Get(ctx, eventID)
 
 	switch {

@@ -114,6 +114,9 @@ func (s *Service) OpenEvent(ctx context.Context, eventID, actorID int64) error {
 }
 
 func (s *Service) DeleteEvent(ctx context.Context, eventID, actorID int64) error {
+	unlock := s.lockEventRender(eventID)
+	defer unlock()
+
 	event, err := s.events.Get(ctx, eventID)
 	if err != nil {
 		return err

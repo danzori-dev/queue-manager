@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	domain "github.com/danzori-dev/queue-manager/internal/domain/queue"
 )
@@ -21,17 +22,19 @@ type Deps struct {
 }
 
 type Service struct {
-	events    EventRepository
-	entries   EntryRepository
-	targets   TargetRepository
-	students  StudentDirectory
-	messages  Messenger
-	scheduler RenderScheduler
-	swaps     *swapStore
-	invites   *inviteStore
-	throttle  *requestThrottle
-	log       *slog.Logger
-	activity  ActivityRecorder
+	events        EventRepository
+	entries       EntryRepository
+	targets       TargetRepository
+	students      StudentDirectory
+	messages      Messenger
+	scheduler     RenderScheduler
+	renderLocksMu sync.Mutex
+	renderLocks   map[int64]*eventRenderLock
+	swaps         *swapStore
+	invites       *inviteStore
+	throttle      *requestThrottle
+	log           *slog.Logger
+	activity      ActivityRecorder
 }
 
 func New(d Deps) *Service {
@@ -105,4 +108,41 @@ func (s *Service) lines(entries []domain.Entry, firstPos int) []Line {
 func (s *Service) audit(ctx context.Context, userID int64, action string, attrs ...slog.Attr) {
 	s.log.LogAttrs(ctx, slog.LevelInfo, action, attrs...)
 	s.activity.Record(userID, action, attrs)
+}
+
+type eventRenderLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
+func (s *Service) lockEventRender(eventID int64) func() {
+	s.renderLocksMu.Lock()
+
+	if s.renderLocks == nil {
+		s.renderLocks = make(map[int64]*eventRenderLock)
+	}
+
+	lock := s.renderLocks[eventID]
+	if lock == nil {
+		lock = &eventRenderLock{}
+		s.renderLocks[eventID] = lock
+	}
+
+	lock.refs++
+
+	s.renderLocksMu.Unlock()
+
+	lock.mu.Lock()
+
+	return func() {
+		lock.mu.Unlock()
+
+		s.renderLocksMu.Lock()
+		defer s.renderLocksMu.Unlock()
+
+		lock.refs--
+		if lock.refs == 0 {
+			delete(s.renderLocks, eventID)
+		}
+	}
 }
